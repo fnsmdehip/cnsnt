@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "cnsnt",
+    "slug": "cnsnt",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/app_icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash_showcase.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAFAFA"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cnsnt.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "cnsnt needs camera access to record videos as part of consent documentation.",
+        "NSMicrophoneUsageDescription": "cnsnt needs microphone access to record audio consent sessions.",
+        "NSFaceIDUsageDescription": "cnsnt uses Face ID to securely protect your consent records."
+      }
+    },
+    "android": {
+      "package": "com.cnsnt.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app_icon.png",
+        "backgroundColor": "#FAFAFA"
+      },
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow cnsnt to use Face ID to protect your consent records."
+        }
+      ]
+    ]
+  }
+}
