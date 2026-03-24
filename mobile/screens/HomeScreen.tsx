@@ -1,8 +1,7 @@
 /**
- * Home Screen - Forms & Templates hub.
- *
- * Shows both legacy form screens and new template-based consent builder.
- * Entitlement-aware: gates premium templates behind paywall.
+ * Home Screen - Templates hub with professional grid layout.
+ * Template cards with category sections, entitlement gating,
+ * quick actions, and upgrade prompts.
  */
 
 import React from 'react';
@@ -18,18 +17,13 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import { getAllTemplates } from '../data/templates';
 import usePurchases from '../hooks/usePurchases';
 import type { ConsentTemplate, TemplateCategory } from '../types';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, MIN_TOUCH_SIZE, FREE_TIER_LIMIT } from '../constants/theme';
 
 interface HomeScreenProps {
   navigation: {
     navigate: (screen: string, params?: Record<string, unknown>) => void;
   };
 }
-
-const legacyForms = [
-  { key: 'Record Audio', screen: 'Recording', icon: '\u{1F3A4}' },
-  { key: 'Consent Checklist', screen: 'ConsentBuilder', icon: '\u{2705}', params: { title: 'Consent Checklist' } },
-];
 
 const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   medical: 'Medical',
@@ -43,18 +37,12 @@ const CATEGORY_LABELS: Record<TemplateCategory, string> = {
 };
 
 const CATEGORY_ORDER: TemplateCategory[] = [
-  'medical',
-  'legal',
-  'business',
-  'media',
-  'research',
-  'property',
-  'personal',
-  'custom',
+  'medical', 'legal', 'business', 'media',
+  'research', 'property', 'personal', 'custom',
 ];
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  const { canUseTemplates, canRecord, entitlement, canCreateRecord } = usePurchases();
+  const { canUseTemplates, canRecord, entitlement, canCreateRecord, recordCount } = usePurchases();
 
   const templates = getAllTemplates();
 
@@ -77,32 +65,91 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     navigation.navigate('TemplateForm', { templateId: template.id });
   };
 
-  const handleLegacyPress = (item: typeof legacyForms[0]) => {
-    if (item.screen === 'Recording' && !canRecord) {
-      navigation.navigate('Settings');
-      return;
-    }
-    navigation.navigate(item.screen, item.params);
-  };
-
-  const renderQuickActions = () => (
-    <View style={styles.quickActionsContainer}>
-      <Text style={styles.quickActionsTitle}>Quick Actions</Text>
-      <View style={styles.quickActionsRow}>
-        {legacyForms.map((item) => (
-          <Pressable
-            key={item.key}
-            style={styles.quickActionCard}
-            onPress={() => handleLegacyPress(item)}
-          >
-            <Text style={styles.quickActionIcon}>{item.icon}</Text>
-            <Text style={styles.quickActionLabel}>{item.key}</Text>
-            {item.screen === 'Recording' && !canRecord && (
-              <Text style={styles.proBadge}>PRO</Text>
-            )}
-          </Pressable>
-        ))}
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      {/* App Header */}
+      <View style={styles.appHeader}>
+        <View style={styles.appHeaderTop}>
+          <View>
+            <Text style={styles.greeting}>Consent Templates</Text>
+            <Text style={styles.appTagline}>Choose a template to get started</Text>
+          </View>
+          {entitlement === 'free' && (
+            <Pressable
+              style={styles.tierBadge}
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <Text style={styles.tierBadgeText}>
+                {recordCount}/{FREE_TIER_LIMIT} FREE
+              </Text>
+            </Pressable>
+          )}
+          {entitlement === 'pro' && (
+            <View style={[styles.tierBadge, styles.proBadge]}>
+              <Text style={[styles.tierBadgeText, styles.proBadgeText]}>PRO</Text>
+            </View>
+          )}
+        </View>
       </View>
+
+      {/* Quick Actions */}
+      <View style={styles.quickActionsContainer}>
+        <Text style={styles.sectionLabel}>Quick Actions</Text>
+        <View style={styles.quickActionsRow}>
+          <Pressable
+            style={styles.quickActionCard}
+            onPress={() => {
+              if (!canRecord) {
+                navigation.navigate('Settings');
+                return;
+              }
+              navigation.navigate('Recording');
+            }}
+          >
+            <View style={[styles.quickActionIconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <Text style={styles.quickActionIcon}>{'\u{1F3A4}'}</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Record Audio</Text>
+            {!canRecord && <Text style={styles.proTag}>PRO</Text>}
+          </Pressable>
+          <Pressable
+            style={styles.quickActionCard}
+            onPress={() => {
+              if (!canCreateRecord) {
+                navigation.navigate('Settings');
+                return;
+              }
+              navigation.navigate('ConsentBuilder', { title: 'Consent Checklist' });
+            }}
+          >
+            <View style={[styles.quickActionIconContainer, { backgroundColor: Colors.successLight }]}>
+              <Text style={styles.quickActionIcon}>{'\u{2705}'}</Text>
+            </View>
+            <Text style={styles.quickActionLabel}>Checklist</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Upgrade Banner */}
+      {entitlement === 'free' && (
+        <Pressable
+          style={styles.upgradeBanner}
+          onPress={() => navigation.navigate('Settings')}
+        >
+          <View style={styles.upgradeBannerContent}>
+            <Text style={styles.upgradeBannerIcon}>{'\u{2B50}'}</Text>
+            <View style={styles.upgradeBannerText}>
+              <Text style={styles.upgradeBannerTitle}>Upgrade to Pro</Text>
+              <Text style={styles.upgradeBannerSubtitle}>
+                Unlimited records, all templates, audio recording
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.upgradeBannerArrow}>{'\u{203A}'}</Text>
+        </Pressable>
+      )}
+
+      <Text style={styles.templatesHeading}>All Templates</Text>
     </View>
   );
 
@@ -115,7 +162,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         onPress={() => handleTemplatePress(item)}
       >
         <View style={styles.templateCardContent}>
-          <Text style={styles.templateIcon}>{item.icon}</Text>
+          <View style={styles.templateIconContainer}>
+            <Text style={styles.templateIcon}>{item.icon}</Text>
+          </View>
           <View style={styles.templateInfo}>
             <Text style={styles.templateName} numberOfLines={1}>
               {item.name}
@@ -123,66 +172,44 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text style={styles.templateDescription} numberOfLines={2}>
               {item.description}
             </Text>
+            <View style={styles.templateMeta}>
+              {item.requiresDualSignature && (
+                <View style={styles.metaBadge}>
+                  <Text style={styles.metaBadgeText}>{'\u{270D}\uFE0F'} Dual Sig</Text>
+                </View>
+              )}
+              {item.defaultExpiryDays != null && (
+                <View style={styles.metaBadge}>
+                  <Text style={styles.metaBadgeText}>{item.defaultExpiryDays}d</Text>
+                </View>
+              )}
+              {item.isPremium && (
+                <View style={[styles.metaBadge, styles.proMetaBadge]}>
+                  <Text style={styles.proMetaText}>PRO</Text>
+                </View>
+              )}
+            </View>
           </View>
-          {isLocked && <Text style={styles.lockIcon}>{'\u{1F512}'}</Text>}
-        </View>
-        <View style={styles.templateMeta}>
-          {item.requiresDualSignature && (
-            <View style={styles.metaBadge}>
-              <Text style={styles.metaBadgeText}>Dual Signature</Text>
-            </View>
+          {isLocked && (
+            <Text style={styles.lockIndicator}>{'\u{1F512}'}</Text>
           )}
-          {item.defaultExpiryDays && (
-            <View style={styles.metaBadge}>
-              <Text style={styles.metaBadgeText}>
-                {item.defaultExpiryDays}d expiry
-              </Text>
-            </View>
-          )}
-          {item.isPremium && (
-            <View style={[styles.metaBadge, styles.proBadgeContainer]}>
-              <Text style={styles.proBadgeText}>PRO</Text>
-            </View>
+          {!isLocked && (
+            <Text style={styles.chevron}>{'\u{203A}'}</Text>
           )}
         </View>
       </Pressable>
     );
   };
 
-  const renderSectionHeader = ({
-    section,
-  }: {
-    section: { title: string };
-  }) => <Text style={styles.sectionHeader}>{section.title}</Text>;
+  const renderSectionHeader = ({ section }: { section: { title: string } }) => (
+    <Text style={styles.sectionHeader}>{section.title}</Text>
+  );
 
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <SectionList
-          ListHeaderComponent={
-            <>
-              <View style={styles.appHeader}>
-                <Text style={styles.appName}>cnsnt</Text>
-                <Text style={styles.appTagline}>
-                  Secure Consent Management
-                </Text>
-                {entitlement === 'free' && (
-                  <Pressable
-                    style={styles.upgradeBanner}
-                    onPress={() => navigation.navigate('Settings')}
-                  >
-                    <Text style={styles.upgradeBannerText}>
-                      Free Tier - Upgrade to Pro for unlimited access
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-
-              {renderQuickActions()}
-
-              <Text style={styles.templatesHeading}>Consent Templates</Text>
-            </>
-          }
+          ListHeaderComponent={renderHeader}
           sections={sections}
           renderItem={renderTemplateItem}
           renderSectionHeader={renderSectionHeader}
@@ -204,45 +231,55 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: Spacing.xxxl,
   },
+  headerContainer: {},
   appHeader: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
-  appName: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: Colors.primary,
-    letterSpacing: 3,
+  appHeaderTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  greeting: {
+    ...Typography.h1,
+    color: Colors.textPrimary,
   },
   appTagline: {
     ...Typography.bodySmall,
     color: Colors.textTertiary,
-    marginTop: Spacing.xs,
+    marginTop: 2,
   },
-  upgradeBanner: {
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
+  tierBadge: {
+    backgroundColor: Colors.surfaceElevated,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.round,
-    marginTop: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  upgradeBannerText: {
+  tierBadgeText: {
     ...Typography.caption,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  proBadge: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  proBadgeText: {
     color: Colors.primary,
-    fontWeight: '500',
   },
   quickActionsContainer: {
     padding: Spacing.lg,
   },
-  quickActionsTitle: {
-    ...Typography.label,
+  sectionLabel: {
+    ...Typography.overline,
     color: Colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
     marginBottom: Spacing.md,
   },
   quickActionsRow: {
@@ -258,36 +295,80 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderLight,
     ...Shadows.sm,
+    minHeight: MIN_TOUCH_SIZE,
+  },
+  quickActionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
   },
   quickActionIcon: {
-    fontSize: 28,
-    marginBottom: Spacing.sm,
+    fontSize: 24,
   },
   quickActionLabel: {
     ...Typography.caption,
     color: Colors.textPrimary,
+    fontWeight: '600',
     textAlign: 'center',
-    fontWeight: '500',
   },
-  proBadge: {
+  proTag: {
     ...Typography.caption,
     color: Colors.primary,
     fontWeight: '700',
     fontSize: 10,
     marginTop: Spacing.xs,
   },
+  upgradeBanner: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.primaryMuted,
+  },
+  upgradeBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  upgradeBannerIcon: {
+    fontSize: 28,
+    marginRight: Spacing.md,
+  },
+  upgradeBannerText: {
+    flex: 1,
+  },
+  upgradeBannerTitle: {
+    ...Typography.body,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  upgradeBannerSubtitle: {
+    ...Typography.caption,
+    color: Colors.primaryDark,
+    marginTop: 2,
+  },
+  upgradeBannerArrow: {
+    fontSize: 28,
+    color: Colors.primary,
+    fontWeight: '300',
+  },
   templatesHeading: {
     ...Typography.h2,
     color: Colors.textPrimary,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   sectionHeader: {
-    ...Typography.label,
+    ...Typography.overline,
     color: Colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.sm,
@@ -304,15 +385,23 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   templateCardLocked: {
-    opacity: 0.7,
+    opacity: 0.65,
   },
   templateCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  templateIcon: {
-    fontSize: 28,
+  templateIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.surfaceElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: Spacing.md,
+  },
+  templateIcon: {
+    fontSize: 24,
   },
   templateInfo: {
     flex: 1,
@@ -326,10 +415,7 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textTertiary,
     marginTop: 2,
-  },
-  lockIcon: {
-    fontSize: 16,
-    marginLeft: Spacing.sm,
+    lineHeight: 18,
   },
   templateMeta: {
     flexDirection: 'row',
@@ -348,14 +434,24 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     fontSize: 11,
   },
-  proBadgeContainer: {
-    backgroundColor: '#EFF6FF',
+  proMetaBadge: {
+    backgroundColor: Colors.primaryLight,
   },
-  proBadgeText: {
+  proMetaText: {
     ...Typography.caption,
     color: Colors.primary,
     fontWeight: '700',
     fontSize: 11,
+  },
+  lockIndicator: {
+    fontSize: 16,
+    marginLeft: Spacing.sm,
+  },
+  chevron: {
+    fontSize: 28,
+    color: Colors.textTertiary,
+    fontWeight: '300',
+    marginLeft: Spacing.sm,
   },
 });
 

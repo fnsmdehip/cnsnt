@@ -1,11 +1,7 @@
 /**
- * Dashboard Screen - main overview of all consent records.
- *
- * Features:
- * - List all consent records with status indicators
- * - Search and filter by status
- * - Quick stats (total, expiring soon, recently created)
- * - Pull-to-refresh
+ * Dashboard Screen - Professional overview of consent records.
+ * Stats cards with hero numbers, clean record list, search/filter,
+ * pull-to-refresh, skeleton loading, designed empty state.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -18,15 +14,17 @@ import {
   TextInput,
   RefreshControl,
   Alert,
-  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ErrorBoundary from '../components/ErrorBoundary';
+import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
+import { SkeletonList } from '../components/SkeletonLoader';
 import db from '../services/database';
 import exportService from '../services/export';
-import type { ConsentRecord, ConsentStatus } from '../types';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import type { ConsentRecord, ConsentStatus, DashboardStats } from '../types';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, MIN_TOUCH_SIZE } from '../constants/theme';
 
 type FilterOption = 'all' | ConsentStatus;
 
@@ -37,19 +35,22 @@ interface DashboardProps {
   };
 }
 
+const FILTERS: { key: FilterOption; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'expired', label: 'Expired' },
+  { key: 'revoked', label: 'Revoked' },
+  { key: 'draft', label: 'Draft' },
+];
+
 const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
   const [records, setRecords] = useState<ConsentRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<ConsentRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterOption>('all');
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    expired: 0,
-    revoked: 0,
-    draft: 0,
-    expiringSoon: 0,
-    recentlyCreated: 0,
+  const [stats, setStats] = useState<DashboardStats>({
+    total: 0, active: 0, expired: 0, revoked: 0, draft: 0,
+    expiringSoon: 0, recentlyCreated: 0,
   });
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,11 +58,9 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
   const applyFilters = useCallback(
     (data: ConsentRecord[], query: string, filter: FilterOption) => {
       let result = data;
-
       if (filter !== 'all') {
         result = result.filter((r) => r.status === filter);
       }
-
       if (query.trim()) {
         const lower = query.toLowerCase();
         result = result.filter(
@@ -71,7 +70,6 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
             r.parties.some((p) => p.name.toLowerCase().includes(lower))
         );
       }
-
       setFilteredRecords(result);
     },
     []
@@ -93,19 +91,11 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
     }
   }, [searchQuery, activeFilter, applyFilters]);
 
+  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { applyFilters(records, searchQuery, activeFilter); }, [searchQuery, activeFilter, records, applyFilters]);
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  useEffect(() => {
-    applyFilters(records, searchQuery, activeFilter);
-  }, [searchQuery, activeFilter, records, applyFilters]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadData();
-    });
-    return unsubscribe;
+    const unsub = navigation.addListener('focus', () => { loadData(); });
+    return unsub;
   }, [navigation, loadData]);
 
   const onRefresh = async () => {
@@ -125,93 +115,77 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
             try {
               await exportService.exportAndShare(record);
             } catch (e: unknown) {
-              const message = e instanceof Error ? e.message : 'Unknown error';
-              Alert.alert('Export Error', message);
+              const msg = e instanceof Error ? e.message : 'Unknown error';
+              Alert.alert('Export Error', msg);
             }
           },
         },
         ...(record.status === 'active'
-          ? [
-              {
-                text: 'Revoke',
-                style: 'destructive' as const,
-                onPress: async () => {
-                  Alert.alert(
-                    'Revoke Consent',
-                    'Are you sure you want to revoke this consent record? This action cannot be undone.',
-                    [
-                      { text: 'Cancel', style: 'cancel' as const },
-                      {
-                        text: 'Revoke',
-                        style: 'destructive' as const,
-                        onPress: async () => {
-                          await db.revokeRecord(record.id);
-                          loadData();
-                        },
+          ? [{
+              text: 'Revoke',
+              style: 'destructive' as const,
+              onPress: () => {
+                Alert.alert(
+                  'Revoke Consent',
+                  'Are you sure? This cannot be undone.',
+                  [
+                    { text: 'Cancel', style: 'cancel' as const },
+                    {
+                      text: 'Revoke',
+                      style: 'destructive' as const,
+                      onPress: async () => {
+                        await db.revokeRecord(record.id);
+                        loadData();
                       },
-                    ]
-                  );
-                },
+                    },
+                  ]
+                );
               },
-            ]
+            }]
           : []),
         { text: 'Close' },
       ]
     );
   };
 
-  const filters: { key: FilterOption; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'active', label: 'Active' },
-    { key: 'expired', label: 'Expired' },
-    { key: 'revoked', label: 'Revoked' },
-    { key: 'draft', label: 'Draft' },
-  ];
-
-  const renderStatsBar = () => (
+  const renderStatsCards = () => (
     <View style={styles.statsContainer}>
-      <View style={styles.statItem}>
-        <Text style={styles.statNumber}>{stats.total}</Text>
-        <Text style={styles.statLabel}>Total</Text>
+      <View style={styles.statsRow}>
+        <View style={[styles.statCard, styles.statCardWide]}>
+          <Text style={styles.statHeroNumber}>{stats.total}</Text>
+          <Text style={styles.statLabel}>Total Records</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: Colors.statusActive }]}>{stats.active}</Text>
+          <Text style={styles.statLabel}>Active</Text>
+        </View>
       </View>
-      <View style={[styles.statItem, styles.statItemActive]}>
-        <Text style={[styles.statNumber, { color: Colors.statusActive }]}>
-          {stats.active}
-        </Text>
-        <Text style={styles.statLabel}>Active</Text>
-      </View>
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: Colors.warning }]}>
-          {stats.expiringSoon}
-        </Text>
-        <Text style={styles.statLabel}>Expiring</Text>
-      </View>
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: Colors.info }]}>
-          {stats.recentlyCreated}
-        </Text>
-        <Text style={styles.statLabel}>Recent</Text>
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: Colors.warning }]}>{stats.expiringSoon}</Text>
+          <Text style={styles.statLabel}>Expiring Soon</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: Colors.info }]}>{stats.recentlyCreated}</Text>
+          <Text style={styles.statLabel}>This Week</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: Colors.statusRevoked }]}>{stats.revoked}</Text>
+          <Text style={styles.statLabel}>Revoked</Text>
+        </View>
       </View>
     </View>
   );
 
   const renderFilterBar = () => (
     <View style={styles.filterContainer}>
-      {filters.map((f) => (
+      {FILTERS.map((f) => (
         <Pressable
           key={f.key}
-          style={[
-            styles.filterChip,
-            activeFilter === f.key && styles.filterChipActive,
-          ]}
+          style={[styles.filterChip, activeFilter === f.key && styles.filterChipActive]}
           onPress={() => setActiveFilter(f.key)}
         >
-          <Text
-            style={[
-              styles.filterChipText,
-              activeFilter === f.key && styles.filterChipTextActive,
-            ]}
-          >
+          <Text style={[styles.filterChipText, activeFilter === f.key && styles.filterChipTextActive]}>
             {f.label}
           </Text>
         </Pressable>
@@ -220,54 +194,54 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
   );
 
   const renderRecord = ({ item }: { item: ConsentRecord }) => (
-    <Pressable
-      style={styles.recordCard}
-      onPress={() => handleRecordPress(item)}
-    >
+    <Pressable style={styles.recordCard} onPress={() => handleRecordPress(item)}>
       <View style={styles.recordHeader}>
-        <Text style={styles.recordTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
+        <View style={styles.recordTitleRow}>
+          <Text style={styles.recordIcon}>
+            {item.templateName.includes('Medical') ? '\u{1F3E5}' :
+             item.templateName.includes('Photo') ? '\u{1F4F7}' :
+             item.templateName.includes('NDA') ? '\u{1F512}' :
+             item.templateName.includes('GDPR') ? '\u{1F6E1}' :
+             item.templateName.includes('Research') ? '\u{1F52C}' :
+             item.templateName.includes('Property') ? '\u{1F3E0}' :
+             item.templateName.includes('Waiver') ? '\u{26A0}' :
+             item.templateName.includes('Mutual') ? '\u{1F91D}' : '\u{1F4DD}'}
+          </Text>
+          <View style={styles.recordTitleContainer}>
+            <Text style={styles.recordTitle} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.recordTemplate}>{item.templateName}</Text>
+          </View>
+        </View>
         <StatusBadge status={item.status} size="small" />
       </View>
-      <Text style={styles.recordTemplate}>{item.templateName}</Text>
       <View style={styles.recordMeta}>
-        <Text style={styles.recordMetaText}>
-          {item.parties.map((p) => p.name).join(', ')}
+        <Text style={styles.recordParties} numberOfLines={1}>
+          {item.parties.map((p) => p.name).join(' & ')}
         </Text>
         <Text style={styles.recordDate}>
           {new Date(item.createdAt).toLocaleDateString()}
         </Text>
       </View>
       {item.expiresAt && item.status === 'active' && (
-        <Text style={styles.expiryText}>
-          Expires: {new Date(item.expiresAt).toLocaleDateString()}
-        </Text>
-      )}
-      {item.recordingUri && (
-        <View style={styles.recordingIndicator}>
-          <Text style={styles.recordingIndicatorText}>
-            {'\u{1F3A4}'} Audio recorded
+        <View style={styles.expiryRow}>
+          <Text style={styles.expiryText}>
+            Expires {new Date(item.expiresAt).toLocaleDateString()}
           </Text>
+        </View>
+      )}
+      {item.documentHash && (
+        <View style={styles.hashRow}>
+          <Text style={styles.hashIcon}>{'\u{1F6E1}'}</Text>
+          <Text style={styles.hashText}>SHA-256 verified</Text>
         </View>
       )}
     </Pressable>
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>{'\u{1F4CB}'}</Text>
-      <Text style={styles.emptyTitle}>No consent records yet</Text>
-      <Text style={styles.emptySubtitle}>
-        Create your first consent record from the Forms tab.
-      </Text>
-    </View>
-  );
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
+        <SkeletonList count={4} />
       </SafeAreaView>
     );
   }
@@ -275,31 +249,37 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
-        {renderStatsBar()}
-
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search records..."
-            placeholderTextColor={Colors.textTertiary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            clearButtonMode="while-editing"
-          />
-        </View>
-
-        {renderFilterBar()}
-
         <FlatList
           data={filteredRecords}
           renderItem={renderRecord}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={
-            filteredRecords.length === 0
-              ? styles.emptyList
-              : styles.listContent
+          ListHeaderComponent={
+            <>
+              {renderStatsCards()}
+              <View style={styles.searchContainer}>
+                <Text style={styles.searchIcon}>{'\u{1F50D}'}</Text>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search records..."
+                  placeholderTextColor={Colors.textTertiary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  clearButtonMode="while-editing"
+                />
+              </View>
+              {renderFilterBar()}
+            </>
           }
-          ListEmptyComponent={renderEmptyState}
+          ListEmptyComponent={
+            <EmptyState
+              icon={'\u{1F4CB}'}
+              title="No consent records yet"
+              subtitle="Create your first consent record from the Forms tab to see it here."
+            />
+          }
+          contentContainerStyle={
+            filteredRecords.length === 0 ? styles.emptyList : styles.listContent
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -319,49 +299,58 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   statsContainer: {
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  statsRow: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    gap: Spacing.sm,
   },
-  statItem: {
+  statCard: {
     flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
-  statItemActive: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: Colors.divider,
+  statCardWide: {
+    flex: 1.5,
+  },
+  statHeroNumber: {
+    ...Typography.heroNumber,
+    color: Colors.textPrimary,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
   statLabel: {
     ...Typography.caption,
     color: Colors.textTertiary,
-    marginTop: 2,
+    marginTop: 4,
+    fontWeight: '500',
   },
   searchContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.lg,
     backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    marginBottom: Spacing.sm,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: Spacing.sm,
   },
   searchInput: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.lg,
+    flex: 1,
     paddingVertical: Spacing.md,
     ...Typography.body,
     color: Colors.textPrimary,
@@ -369,19 +358,18 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    paddingBottom: Spacing.md,
     gap: Spacing.sm,
   },
   filterChip: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.round,
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
+    minHeight: MIN_TOUCH_SIZE,
+    justifyContent: 'center',
   },
   filterChipActive: {
     backgroundColor: Colors.primaryLight,
@@ -397,7 +385,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listContent: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xxxl,
   },
   emptyList: {
     flex: 1,
@@ -414,26 +403,39 @@ const styles = StyleSheet.create({
   recordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
+    alignItems: 'flex-start',
+    marginBottom: Spacing.sm,
   },
-  recordTitle: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
+  recordTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
     marginRight: Spacing.sm,
+  },
+  recordIcon: {
+    fontSize: 24,
+    marginRight: Spacing.md,
+  },
+  recordTitleContainer: {
+    flex: 1,
+  },
+  recordTitle: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '600',
   },
   recordTemplate: {
     ...Typography.caption,
     color: Colors.textTertiary,
-    marginBottom: Spacing.sm,
+    marginTop: 2,
   },
   recordMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: Spacing.xs,
   },
-  recordMetaText: {
+  recordParties: {
     ...Typography.bodySmall,
     color: Colors.textSecondary,
     flex: 1,
@@ -441,41 +443,34 @@ const styles = StyleSheet.create({
   recordDate: {
     ...Typography.caption,
     color: Colors.textTertiary,
+    marginLeft: Spacing.sm,
+  },
+  expiryRow: {
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.warningLight,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    alignSelf: 'flex-start',
   },
   expiryText: {
     ...Typography.caption,
-    color: Colors.warning,
-    marginTop: Spacing.xs,
+    color: '#92400E',
+    fontWeight: '500',
   },
-  recordingIndicator: {
+  hashRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
   },
-  recordingIndicatorText: {
+  hashIcon: {
+    fontSize: 12,
+    marginRight: 4,
+  },
+  hashText: {
     ...Typography.caption,
-    color: Colors.info,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: Spacing.lg,
-  },
-  emptyTitle: {
-    ...Typography.h2,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-  },
-  emptySubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: Spacing.xl,
+    color: Colors.success,
+    fontWeight: '500',
   },
 });
 

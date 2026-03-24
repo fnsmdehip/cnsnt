@@ -1,35 +1,51 @@
 /**
- * Lock Screen - handles biometric and PIN authentication.
- * Shown on app open and after auto-lock timeout.
+ * Professional Lock Screen with biometric prompt.
+ * Animated unlock, PIN pad with haptic-ready feedback, smooth transitions.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   Pressable,
-  Alert,
+  Animated,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import authService from '../services/auth';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, MIN_TOUCH_SIZE } from '../constants/theme';
 
 interface LockScreenProps {
   onUnlock: () => void;
 }
 
+const PIN_LENGTH = 4;
+const PIN_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+
 const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
   const [pin, setPin] = useState('');
-  const [pinConfirm, setPinConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [pinIsSet, setPinIsSet] = useState(false);
+  const [confirmPin, setConfirmPin] = useState('');
+  const [isConfirming, setIsConfirming] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [biometricName, setBiometricName] = useState('Biometric');
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const shake = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  }, [shakeAnim]);
 
   const checkAuthState = useCallback(async () => {
     setLoading(true);
@@ -44,6 +60,12 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         setBiometricName(name);
       }
 
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+
       if (state.biometricEnabled && state.pinIsSet) {
         const success = await authService.authenticateWithBiometrics();
         if (success) {
@@ -52,62 +74,89 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         }
       }
     } catch (_e) {
-      Alert.alert('Error', 'Authentication check failed. Please try again.');
+      // Silently fail - user can still use PIN
     } finally {
       setLoading(false);
     }
-  }, [onUnlock]);
+  }, [onUnlock, fadeAnim]);
 
   useEffect(() => {
     checkAuthState();
   }, [checkAuthState]);
 
-  const handleSetPin = async () => {
-    setError('');
-    if (pin.length < 4) {
-      setError('PIN must be at least 4 digits');
-      return;
-    }
-    if (pin !== pinConfirm) {
-      setError('PINs do not match');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await authService.setPin(pin);
-      onUnlock();
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Failed to set PIN';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEnterPin = async () => {
-    setError('');
-    if (!pin) {
-      setError('Please enter your PIN');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const success = await authService.authenticateWithPin(pin);
-      if (success) {
-        onUnlock();
-      } else {
-        setError('Incorrect PIN');
-        setPin('');
+  const handlePinEntry = useCallback(
+    async (fullPin: string) => {
+      if (!pinIsSet) {
+        // Setup mode
+        if (!isConfirming) {
+          setConfirmPin(fullPin);
+          setIsConfirming(true);
+          setPin('');
+          return;
+        }
+        if (fullPin !== confirmPin) {
+          setError('PINs do not match. Try again.');
+          shake();
+          setIsConfirming(false);
+          setConfirmPin('');
+          setPin('');
+          return;
+        }
+        setLoading(true);
+        try {
+          await authService.setPin(fullPin);
+          onUnlock();
+        } catch (_e) {
+          setError('Failed to set PIN');
+          shake();
+          setPin('');
+        } finally {
+          setLoading(false);
+        }
+        return;
       }
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Authentication failed';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      // Auth mode
+      setLoading(true);
+      try {
+        const success = await authService.authenticateWithPin(fullPin);
+        if (success) {
+          onUnlock();
+        } else {
+          setError('Incorrect PIN');
+          shake();
+          setPin('');
+        }
+      } catch (_e) {
+        setError('Authentication failed');
+        shake();
+        setPin('');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [pinIsSet, isConfirming, confirmPin, onUnlock, shake]
+  );
+
+  const handleDigitPress = useCallback(
+    (digit: string) => {
+      if (digit === 'del') {
+        setPin((prev) => prev.slice(0, -1));
+        setError('');
+        return;
+      }
+      if (digit === '') return;
+
+      const newPin = pin + digit;
+      setPin(newPin);
+      setError('');
+
+      if (newPin.length >= PIN_LENGTH) {
+        setTimeout(() => handlePinEntry(newPin), 100);
+      }
+    },
+    [pin, handlePinEntry]
+  );
 
   const handleBiometric = async () => {
     setError('');
@@ -117,22 +166,30 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
       if (success) {
         onUnlock();
       } else {
-        setError(`${biometricName} authentication failed. Use PIN instead.`);
+        setError(`${biometricName} failed. Use PIN instead.`);
       }
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Biometric auth failed';
-      setError(message);
+    } catch (_e) {
+      setError('Biometric auth failed');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
+  const getSubtitle = () => {
+    if (!pinIsSet && !isConfirming) return 'Create a PIN to secure your vault';
+    if (!pinIsSet && isConfirming) return 'Confirm your PIN';
+    return 'Enter your PIN to unlock';
+  };
+
+  if (loading && pin.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContent}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Authenticating...</Text>
+          <View style={styles.lockIconContainer}>
+            <Text style={styles.lockEmoji}>{'\u{1F512}'}</Text>
+          </View>
+          <Text style={styles.appNameLoading}>cnsnt</Text>
+          <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 16 }} />
         </View>
       </SafeAreaView>
     );
@@ -140,63 +197,77 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.lockIcon}>{'\u{1F512}'}</Text>
-        <Text style={styles.appName}>cnsnt</Text>
-        <Text style={styles.subtitle}>
-          {pinIsSet ? 'Enter your PIN to unlock' : 'Create a PIN to get started'}
-        </Text>
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.pinInput}
-            secureTextEntry
-            keyboardType="numeric"
-            maxLength={8}
-            placeholder="Enter PIN"
-            placeholderTextColor={Colors.textTertiary}
-            value={pin}
-            onChangeText={setPin}
-            autoFocus
-          />
-
-          {!pinIsSet && (
-            <TextInput
-              style={styles.pinInput}
-              secureTextEntry
-              keyboardType="numeric"
-              maxLength={8}
-              placeholder="Confirm PIN"
-              placeholderTextColor={Colors.textTertiary}
-              value={pinConfirm}
-              onChangeText={setPinConfirm}
-            />
-          )}
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.lockIconSmall}>
+            <Text style={styles.lockEmojiSmall}>{'\u{1F512}'}</Text>
+          </View>
+          <Text style={styles.appName}>cnsnt</Text>
+          <Text style={styles.subtitle}>{getSubtitle()}</Text>
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <Pressable
-          style={styles.primaryButton}
-          onPress={pinIsSet ? handleEnterPin : handleSetPin}
+        {/* PIN Dots */}
+        <Animated.View
+          style={[
+            styles.dotsRow,
+            { transform: [{ translateX: shakeAnim }] },
+          ]}
         >
-          <Text style={styles.primaryButtonText}>
-            {pinIsSet ? 'Unlock' : 'Set PIN'}
-          </Text>
-        </Pressable>
+          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.pinDot,
+                i < pin.length && styles.pinDotFilled,
+                error && pin.length === 0 && styles.pinDotError,
+              ]}
+            />
+          ))}
+        </Animated.View>
 
+        {error ? <Text style={styles.error}>{error}</Text> : <View style={styles.errorSpacer} />}
+
+        {/* Number Pad */}
+        <View style={styles.numPad}>
+          {PIN_DIGITS.map((digit, i) => (
+            <Pressable
+              key={i}
+              style={[
+                styles.numKey,
+                digit === '' && styles.numKeyEmpty,
+                digit === 'del' && styles.numKeyDel,
+              ]}
+              onPress={() => handleDigitPress(digit)}
+              disabled={digit === '' || loading}
+            >
+              <Text
+                style={[
+                  styles.numKeyText,
+                  digit === 'del' && styles.numKeyDelText,
+                ]}
+              >
+                {digit === 'del' ? '\u{232B}' : digit}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Biometric Button */}
         {pinIsSet && biometricEnabled && hasBiometrics && (
           <Pressable style={styles.biometricButton} onPress={handleBiometric}>
-            <Text style={styles.biometricButtonText}>
+            <Text style={styles.biometricText}>
               Use {biometricName}
             </Text>
           </Pressable>
         )}
-      </View>
+      </Animated.View>
 
-      <Text style={styles.footer}>
-        Your data is encrypted and stored locally on this device.
-      </Text>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          Encrypted locally on this device
+        </Text>
+      </View>
     </SafeAreaView>
   );
 };
@@ -204,96 +275,150 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
   },
   loadingContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
-    flex: 1,
+  lockIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
+    marginBottom: 16,
   },
-  lockIcon: {
-    fontSize: 56,
-    marginBottom: Spacing.lg,
+  lockEmoji: {
+    fontSize: 36,
+  },
+  appNameLoading: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    letterSpacing: 3,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: Spacing.xl,
+    justifyContent: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: Spacing.xxl,
+  },
+  lockIconSmall: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  lockEmojiSmall: {
+    fontSize: 26,
   },
   appName: {
-    ...Typography.h1,
-    color: Colors.primary,
-    marginBottom: Spacing.sm,
-    letterSpacing: 2,
+    fontSize: 28,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    letterSpacing: 3,
+    marginBottom: Spacing.xs,
   },
   subtitle: {
-    ...Typography.body,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
-    marginBottom: Spacing.xxl,
-    textAlign: 'center',
   },
-  inputContainer: {
-    width: '100%',
-    maxWidth: 280,
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
     marginBottom: Spacing.lg,
   },
-  pinInput: {
-    borderWidth: 1.5,
+  pinDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
     borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    fontSize: 24,
-    textAlign: 'center',
-    letterSpacing: 8,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
+    backgroundColor: 'transparent',
+  },
+  pinDotFilled: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  pinDotError: {
+    borderColor: Colors.error,
   },
   error: {
     ...Typography.bodySmall,
     color: Colors.error,
     textAlign: 'center',
     marginBottom: Spacing.lg,
+    minHeight: 20,
   },
-  primaryButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.xxxl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
+  errorSpacer: {
+    minHeight: 20,
     marginBottom: Spacing.lg,
-    minWidth: 200,
-    alignItems: 'center',
-    ...Shadows.md,
   },
-  primaryButtonText: {
-    ...Typography.button,
-    color: Colors.textInverse,
+  numPad: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    maxWidth: 300,
+    alignSelf: 'center',
+  },
+  numKey: {
+    width: 80,
+    height: 80,
+    margin: 6,
+    borderRadius: 40,
+    backgroundColor: Colors.surfaceElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: MIN_TOUCH_SIZE,
+    minWidth: MIN_TOUCH_SIZE,
+  },
+  numKeyEmpty: {
+    backgroundColor: 'transparent',
+  },
+  numKeyDel: {
+    backgroundColor: 'transparent',
+  },
+  numKeyText: {
+    fontSize: 28,
+    fontWeight: '400',
+    color: Colors.textPrimary,
+  },
+  numKeyDelText: {
+    fontSize: 24,
+    color: Colors.textSecondary,
   },
   biometricButton: {
+    alignSelf: 'center',
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
     borderWidth: 1.5,
     borderColor: Colors.primary,
-    minWidth: 200,
-    alignItems: 'center',
+    marginTop: Spacing.xl,
+    minHeight: MIN_TOUCH_SIZE,
+    justifyContent: 'center',
   },
-  biometricButtonText: {
+  biometricText: {
     ...Typography.button,
     color: Colors.primary,
   },
-  loadingText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.lg,
-  },
   footer: {
+    paddingBottom: Spacing.xxl,
+    alignItems: 'center',
+  },
+  footerText: {
     ...Typography.caption,
     color: Colors.textTertiary,
-    textAlign: 'center',
-    paddingBottom: Spacing.xl,
-    paddingHorizontal: Spacing.xl,
   },
 });
 

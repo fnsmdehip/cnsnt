@@ -1,18 +1,26 @@
 /**
  * Design system constants for cnsnt app.
- * Clean light theme with trust-building colors for legal/security use.
+ * Professional trust-building palette for legal/security context.
+ * SF Pro Display for hero numbers, SF Pro Text for body (17pt).
+ * Minimum 44x44pt touch targets, 60fps animations <400ms.
  */
+
+import { Platform } from 'react-native';
 
 export const Colors = {
   // Primary palette
   primary: '#3B82F6',
   primaryDark: '#2563EB',
   primaryLight: '#EFF6FF',
+  primaryMuted: '#DBEAFE',
 
   // Status
   success: '#10B981',
+  successLight: '#D1FAE5',
   warning: '#F59E0B',
+  warningLight: '#FEF3C7',
   error: '#EF4444',
+  errorLight: '#FEE2E2',
   info: '#3B82F6',
 
   // Neutrals
@@ -35,17 +43,82 @@ export const Colors = {
   statusExpired: '#F59E0B',
   statusRevoked: '#EF4444',
   statusDraft: '#94A3B8',
+
+  // Tab bar
+  tabBarBackground: '#FFFFFF',
+  tabBarBorder: '#E2E8F0',
+  tabBarActive: '#3B82F6',
+  tabBarInactive: '#94A3B8',
+
+  // Onboarding
+  onboardingGradientStart: '#3B82F6',
+  onboardingGradientEnd: '#1D4ED8',
+
+  // Overlay
+  overlay: 'rgba(0,0,0,0.5)',
+  overlayLight: 'rgba(0,0,0,0.3)',
 } as const;
 
 export const Typography = {
-  h1: { fontSize: 28, lineHeight: 36, fontWeight: '700' as const },
-  h2: { fontSize: 22, lineHeight: 28, fontWeight: '600' as const },
-  h3: { fontSize: 18, lineHeight: 24, fontWeight: '600' as const },
-  body: { fontSize: 16, lineHeight: 24, fontWeight: '400' as const },
-  bodySmall: { fontSize: 14, lineHeight: 20, fontWeight: '400' as const },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' as const },
-  button: { fontSize: 16, lineHeight: 24, fontWeight: '600' as const },
-  label: { fontSize: 14, lineHeight: 20, fontWeight: '500' as const },
+  // SF Pro Display for hero numbers
+  heroNumber: {
+    fontSize: 48,
+    lineHeight: 56,
+    fontWeight: '700' as const,
+    fontFamily: Platform.OS === 'ios' ? 'System' : undefined,
+    letterSpacing: -1,
+  },
+  h1: {
+    fontSize: 28,
+    lineHeight: 36,
+    fontWeight: '700' as const,
+    fontFamily: Platform.OS === 'ios' ? 'System' : undefined,
+    letterSpacing: -0.5,
+  },
+  h2: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '600' as const,
+    fontFamily: Platform.OS === 'ios' ? 'System' : undefined,
+  },
+  h3: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '600' as const,
+  },
+  // SF Pro Text for body (17pt)
+  body: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '400' as const,
+  },
+  bodySmall: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '400' as const,
+  },
+  caption: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400' as const,
+  },
+  button: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '600' as const,
+  },
+  label: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '500' as const,
+  },
+  overline: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600' as const,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase' as const,
+  },
 } as const;
 
 export const Spacing = {
@@ -59,10 +132,11 @@ export const Spacing = {
 } as const;
 
 export const BorderRadius = {
-  sm: 4,
-  md: 8,
-  lg: 16,
+  sm: 6,
+  md: 10,
+  lg: 14,
   xl: 20,
+  xxl: 28,
   round: 9999,
 } as const;
 
@@ -71,25 +145,40 @@ export const Shadows = {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowRadius: 3,
     elevation: 1,
   },
   md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
   },
+} as const;
+
+// Touch target minimum 44x44pt
+export const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+export const MIN_TOUCH_SIZE = 44;
+
+// Animation durations (<400ms for 60fps feel)
+export const Animations = {
+  fast: 150,
+  normal: 250,
+  slow: 350,
+  spring: { damping: 15, stiffness: 150 },
 } as const;
 
 export const AUTO_LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 export const FREE_TIER_LIMIT = 5;
+
+export const PRO_MONTHLY_PRICE = '$4.99';
+export const PRO_YEARLY_PRICE = '$39.99';

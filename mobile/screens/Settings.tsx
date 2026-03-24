@@ -1,12 +1,6 @@
 /**
- * Settings Screen for cnsnt app.
- *
- * - Biometric toggle
- * - Auto-lock timeout
- * - Export all data
- * - Delete all data (with confirmation)
- * - About / legal
- * - Subscription management
+ * Settings Screen - Professional subscription management and security settings.
+ * Clean grouped sections, toggle switches, subscription card.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -26,7 +20,7 @@ import authService from '../services/auth';
 import db from '../services/database';
 import exportService from '../services/export';
 import purchaseService from '../services/purchases';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, MIN_TOUCH_SIZE, PRO_MONTHLY_PRICE, PRO_YEARLY_PRICE, FREE_TIER_LIMIT } from '../constants/theme';
 import type { Entitlement } from '../types';
 
 interface SettingsProps {
@@ -70,18 +64,13 @@ const Settings: React.FC<SettingsProps> = ({ onLock }) => {
     }
   }, []);
 
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+  useEffect(() => { loadSettings(); }, [loadSettings]);
 
   const handleBiometricToggle = async (value: boolean) => {
     if (value) {
       const success = await authService.authenticateWithBiometrics();
       if (!success) {
-        Alert.alert(
-          'Authentication Required',
-          `Please verify with ${biometricName} to enable it.`
-        );
+        Alert.alert('Authentication Required', `Please verify with ${biometricName} to enable it.`);
         return;
       }
     }
@@ -105,8 +94,8 @@ const Settings: React.FC<SettingsProps> = ({ onLock }) => {
       const uri = await exportService.exportAllAsJson(records);
       await exportService.shareFile(uri);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to export data.';
-      Alert.alert('Export Error', message);
+      const msg = error instanceof Error ? error.message : 'Failed to export.';
+      Alert.alert('Export Error', msg);
     } finally {
       setExporting(false);
     }
@@ -115,7 +104,7 @@ const Settings: React.FC<SettingsProps> = ({ onLock }) => {
   const handleDeleteAll = () => {
     Alert.alert(
       'Delete All Data',
-      'This will permanently delete all consent records, encryption keys, and authentication data. This action cannot be undone.',
+      'This will permanently delete all consent records, encryption keys, and authentication data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -135,14 +124,11 @@ const Settings: React.FC<SettingsProps> = ({ onLock }) => {
                       await db.deleteAllRecords();
                       await authService.resetAll();
                       Alert.alert('Deleted', 'All data has been removed.', [
-                        {
-                          text: 'OK',
-                          onPress: () => onLock(),
-                        },
+                        { text: 'OK', onPress: () => onLock() },
                       ]);
                     } catch (error: unknown) {
-                      const message = error instanceof Error ? error.message : 'Failed to delete data.';
-                      Alert.alert('Error', message);
+                      const msg = error instanceof Error ? error.message : 'Failed to delete.';
+                      Alert.alert('Error', msg);
                     }
                   },
                 },
@@ -163,7 +149,7 @@ const Settings: React.FC<SettingsProps> = ({ onLock }) => {
     const success = await purchaseService.purchasePro();
     if (success) {
       setEntitlement('pro');
-      Alert.alert('Success', 'You are now a Pro subscriber!');
+      Alert.alert('Welcome to Pro!', 'You now have unlimited access.');
     } else {
       Alert.alert(
         'Upgrade',
@@ -193,143 +179,160 @@ const Settings: React.FC<SettingsProps> = ({ onLock }) => {
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Security */}
-          <Text style={styles.sectionTitle}>Security</Text>
-
-          {hasBiometrics && (
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>
-                  {biometricName} Unlock
-                </Text>
-                <Text style={styles.settingDescription}>
-                  Use {biometricName} to unlock the app
-                </Text>
-              </View>
-              <Switch
-                value={biometricEnabled}
-                onValueChange={handleBiometricToggle}
-                trackColor={{
-                  false: Colors.border,
-                  true: Colors.primaryLight,
-                }}
-                thumbColor={
-                  biometricEnabled ? Colors.primary : Colors.surfaceElevated
-                }
-              />
-            </View>
-          )}
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Auto-Lock Timeout</Text>
-              <Text style={styles.settingDescription}>
-                Lock the app after inactivity
-              </Text>
-            </View>
-          </View>
-          <View style={styles.optionsRow}>
-            {AUTO_LOCK_OPTIONS.map((minutes) => (
-              <Pressable
-                key={minutes}
-                style={[
-                  styles.optionChip,
-                  autoLockMinutes === minutes && styles.optionChipActive,
-                ]}
-                onPress={() => handleAutoLockChange(minutes)}
-              >
-                <Text
-                  style={[
-                    styles.optionChipText,
-                    autoLockMinutes === minutes &&
-                      styles.optionChipTextActive,
-                  ]}
-                >
-                  {minutes}m
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Pressable style={styles.actionButton} onPress={handleLockNow}>
-            <Text style={styles.actionButtonText}>
-              {'\u{1F512}'} Lock Now
-            </Text>
-          </Pressable>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
           {/* Subscription */}
           <Text style={styles.sectionTitle}>Subscription</Text>
-
-          <View style={styles.subscriptionCard}>
-            <View style={styles.subscriptionBadge}>
-              <Text style={styles.subscriptionBadgeText}>
-                {entitlement === 'pro' ? 'PRO' : 'FREE'}
-              </Text>
-            </View>
-            <Text style={styles.subscriptionInfo}>
-              {entitlement === 'pro'
-                ? 'Unlimited records, recording, and all templates.'
-                : `Free tier: ${recordCount}/5 records used.`}
-            </Text>
-            {entitlement === 'free' && (
-              <Pressable
-                style={styles.upgradeButton}
-                onPress={handleUpgrade}
-              >
-                <Text style={styles.upgradeButtonText}>
-                  Upgrade to Pro - $4.99/mo
+          <View style={[styles.subscriptionCard, entitlement === 'pro' && styles.subscriptionCardPro]}>
+            <View style={styles.subscriptionHeader}>
+              <View style={[styles.planBadge, entitlement === 'pro' && styles.planBadgePro]}>
+                <Text style={[styles.planBadgeText, entitlement === 'pro' && styles.planBadgeTextPro]}>
+                  {entitlement === 'pro' ? 'PRO' : 'FREE'}
                 </Text>
-              </Pressable>
+              </View>
+            </View>
+            {entitlement === 'free' ? (
+              <>
+                <View style={styles.usageBar}>
+                  <View style={styles.usageTrack}>
+                    <View style={[styles.usageFill, { width: `${(recordCount / FREE_TIER_LIMIT) * 100}%` }]} />
+                  </View>
+                  <Text style={styles.usageText}>{recordCount} / {FREE_TIER_LIMIT} records used</Text>
+                </View>
+                <View style={styles.proFeaturesList}>
+                  {[
+                    'Unlimited consent records',
+                    'All 8 premium templates',
+                    'Audio recording',
+                    'Priority support',
+                  ].map((f, i) => (
+                    <Text key={i} style={styles.proFeature}>{'\u2713'}  {f}</Text>
+                  ))}
+                </View>
+                <Pressable style={styles.upgradeButton} onPress={handleUpgrade}>
+                  <Text style={styles.upgradeButtonText}>
+                    Upgrade to Pro - {PRO_MONTHLY_PRICE}/mo
+                  </Text>
+                </Pressable>
+                <Text style={styles.yearlyOption}>or {PRO_YEARLY_PRICE}/year (save 33%)</Text>
+              </>
+            ) : (
+              <Text style={styles.proActiveText}>
+                Unlimited records, all templates, audio recording.
+              </Text>
             )}
-            <Pressable onPress={handleRestorePurchases}>
+            <Pressable style={styles.restoreButton} onPress={handleRestorePurchases}>
               <Text style={styles.restoreText}>Restore Purchases</Text>
             </Pressable>
           </View>
 
+          {/* Security */}
+          <Text style={styles.sectionTitle}>Security</Text>
+          <View style={styles.settingsGroup}>
+            {hasBiometrics && (
+              <View style={styles.settingRow}>
+                <View style={styles.settingIconContainer}>
+                  <Text style={styles.settingIcon}>
+                    {biometricName === 'Face ID' ? '\u{1F9D1}' : '\u{1F91A}'}
+                  </Text>
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>{biometricName} Unlock</Text>
+                  <Text style={styles.settingDescription}>Use {biometricName} to unlock</Text>
+                </View>
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={handleBiometricToggle}
+                  trackColor={{ false: Colors.border, true: Colors.primaryMuted }}
+                  thumbColor={biometricEnabled ? Colors.primary : Colors.surfaceElevated}
+                />
+              </View>
+            )}
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingIconContainer}>
+                <Text style={styles.settingIcon}>{'\u{23F1}'}</Text>
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Auto-Lock Timeout</Text>
+                <Text style={styles.settingDescription}>Lock after inactivity</Text>
+              </View>
+            </View>
+            <View style={styles.optionsRow}>
+              {AUTO_LOCK_OPTIONS.map((minutes) => (
+                <Pressable
+                  key={minutes}
+                  style={[
+                    styles.optionChip,
+                    autoLockMinutes === minutes && styles.optionChipActive,
+                  ]}
+                  onPress={() => handleAutoLockChange(minutes)}
+                >
+                  <Text style={[
+                    styles.optionChipText,
+                    autoLockMinutes === minutes && styles.optionChipTextActive,
+                  ]}>
+                    {minutes}m
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable style={styles.settingAction} onPress={handleLockNow}>
+              <View style={styles.settingIconContainer}>
+                <Text style={styles.settingIcon}>{'\u{1F512}'}</Text>
+              </View>
+              <Text style={styles.settingActionText}>Lock Now</Text>
+            </Pressable>
+          </View>
+
           {/* Data */}
-          <Text style={styles.sectionTitle}>Data</Text>
+          <Text style={styles.sectionTitle}>Data Management</Text>
+          <View style={styles.settingsGroup}>
+            <Pressable
+              style={styles.settingAction}
+              onPress={handleExportAll}
+              disabled={exporting}
+            >
+              <View style={styles.settingIconContainer}>
+                <Text style={styles.settingIcon}>{'\u{1F4E4}'}</Text>
+              </View>
+              <Text style={styles.settingActionText}>
+                {exporting ? 'Exporting...' : `Export All Data (${recordCount} records)`}
+              </Text>
+            </Pressable>
 
-          <Pressable
-            style={styles.actionButton}
-            onPress={handleExportAll}
-            disabled={exporting}
-          >
-            <Text style={styles.actionButtonText}>
-              {exporting
-                ? 'Exporting...'
-                : `\u{1F4E4} Export All Data (${recordCount} records)`}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.actionButton, styles.destructiveButton]}
-            onPress={handleDeleteAll}
-          >
-            <Text style={styles.destructiveButtonText}>
-              {'\u{1F5D1}'} Delete All Data
-            </Text>
-          </Pressable>
+            <Pressable style={[styles.settingAction, styles.settingActionDanger]} onPress={handleDeleteAll}>
+              <View style={[styles.settingIconContainer, { backgroundColor: Colors.errorLight }]}>
+                <Text style={styles.settingIcon}>{'\u{1F5D1}'}</Text>
+              </View>
+              <Text style={styles.settingActionDangerText}>Delete All Data</Text>
+            </Pressable>
+          </View>
 
           {/* About */}
           <Text style={styles.sectionTitle}>About</Text>
-
           <View style={styles.aboutCard}>
-            <Text style={styles.aboutTitle}>cnsnt</Text>
+            <Text style={styles.aboutAppName}>cnsnt</Text>
             <Text style={styles.aboutVersion}>Version 1.0.0</Text>
             <Text style={styles.aboutDescription}>
-              Secure consent management for professionals. All data is
-              encrypted and stored locally on your device.
+              Secure consent management for professionals. All data is encrypted and stored locally on your device.
             </Text>
             <View style={styles.aboutDivider} />
             <Text style={styles.legalText}>
-              This app is not a substitute for legal advice. Consult a
-              qualified attorney for specific legal needs.
+              This app is not a substitute for legal advice.
             </Text>
-            <Text style={styles.legalText}>
-              Privacy Policy | Terms of Service
-            </Text>
+            <View style={styles.legalLinks}>
+              <Pressable style={styles.legalLink}>
+                <Text style={styles.legalLinkText}>Privacy Policy</Text>
+              </Pressable>
+              <Text style={styles.legalDot}>{'\u{2022}'}</Text>
+              <Pressable style={styles.legalLink}>
+                <Text style={styles.legalLinkText}>Terms of Service</Text>
+              </Pressable>
+            </View>
           </View>
+
         </ScrollView>
       </SafeAreaView>
     </ErrorBoundary>
@@ -349,26 +352,138 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.lg,
-    paddingBottom: Spacing.xxxl,
+    paddingBottom: Spacing.xxxl * 2,
   },
   sectionTitle: {
-    ...Typography.label,
+    ...Typography.overline,
     color: Colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
     marginTop: Spacing.xl,
     marginBottom: Spacing.md,
   },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  subscriptionCard: {
     backgroundColor: Colors.surface,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
     borderWidth: 1,
     borderColor: Colors.borderLight,
+    ...Shadows.sm,
+  },
+  subscriptionCardPro: {
+    borderColor: Colors.primary,
+    borderWidth: 2,
+    backgroundColor: Colors.primaryLight,
+  },
+  subscriptionHeader: {
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  planBadge: {
+    backgroundColor: Colors.surfaceElevated,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.round,
+  },
+  planBadgePro: {
+    backgroundColor: Colors.primary,
+  },
+  planBadgeText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  planBadgeTextPro: {
+    color: Colors.textInverse,
+  },
+  usageBar: {
+    marginBottom: Spacing.lg,
+  },
+  usageTrack: {
+    height: 6,
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: Spacing.xs,
+  },
+  usageFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 3,
+  },
+  usageText: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+  },
+  proFeaturesList: {
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  proFeature: {
+    ...Typography.bodySmall,
+    color: Colors.textSecondary,
+  },
+  upgradeButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    minHeight: MIN_TOUCH_SIZE,
+    justifyContent: 'center',
+    ...Shadows.md,
+  },
+  upgradeButtonText: {
+    ...Typography.button,
+    color: Colors.textInverse,
+  },
+  yearlyOption: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  proActiveText: {
+    ...Typography.body,
+    color: Colors.primaryDark,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  restoreButton: {
+    minHeight: MIN_TOUCH_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restoreText: {
+    ...Typography.bodySmall,
+    color: Colors.textLink,
+  },
+  settingsGroup: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    overflow: 'hidden',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+    minHeight: MIN_TOUCH_SIZE,
+  },
+  settingIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.surfaceElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  settingIcon: {
+    fontSize: 18,
   },
   settingInfo: {
     flex: 1,
@@ -388,15 +503,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
   },
   optionChip: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.round,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceElevated,
     borderWidth: 1,
     borderColor: Colors.border,
+    minHeight: MIN_TOUCH_SIZE,
+    justifyContent: 'center',
   },
   optionChipActive: {
     backgroundColor: Colors.primaryLight,
@@ -410,72 +529,26 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '600',
   },
-  actionButton: {
-    backgroundColor: Colors.surface,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
+  settingAction: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+    minHeight: MIN_TOUCH_SIZE,
   },
-  actionButtonText: {
+  settingActionText: {
     ...Typography.body,
     color: Colors.primary,
     fontWeight: '500',
   },
-  destructiveButton: {
-    borderColor: '#FFCDD2',
-    backgroundColor: '#FFF5F5',
+  settingActionDanger: {
+    borderBottomWidth: 0,
   },
-  destructiveButtonText: {
+  settingActionDangerText: {
     ...Typography.body,
     color: Colors.error,
     fontWeight: '500',
-  },
-  subscriptionCard: {
-    backgroundColor: Colors.surface,
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    ...Shadows.sm,
-  },
-  subscriptionBadge: {
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.round,
-    marginBottom: Spacing.md,
-  },
-  subscriptionBadgeText: {
-    ...Typography.label,
-    color: Colors.primary,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  subscriptionInfo: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-  upgradeButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
-    ...Shadows.md,
-  },
-  upgradeButtonText: {
-    ...Typography.button,
-    color: Colors.textInverse,
-  },
-  restoreText: {
-    ...Typography.bodySmall,
-    color: Colors.textLink,
   },
   aboutCard: {
     backgroundColor: Colors.surface,
@@ -484,11 +557,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.borderLight,
+    marginBottom: Spacing.xxl,
   },
-  aboutTitle: {
-    ...Typography.h1,
+  aboutAppName: {
+    fontSize: 28,
+    fontWeight: '700',
     color: Colors.primary,
-    letterSpacing: 2,
+    letterSpacing: 3,
   },
   aboutVersion: {
     ...Typography.caption,
@@ -499,6 +574,7 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.textSecondary,
     textAlign: 'center',
+    lineHeight: 24,
   },
   aboutDivider: {
     height: 1,
@@ -510,7 +586,23 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textTertiary,
     textAlign: 'center',
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  legalLink: {
+    minHeight: MIN_TOUCH_SIZE,
+    justifyContent: 'center',
+  },
+  legalLinkText: {
+    ...Typography.bodySmall,
+    color: Colors.textLink,
+  },
+  legalDot: {
+    color: Colors.textTertiary,
   },
 });
 

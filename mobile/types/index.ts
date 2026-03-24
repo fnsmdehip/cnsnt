@@ -10,29 +10,29 @@ export interface ConsentRecord {
   templateName: string;
   title: string;
   status: ConsentStatus;
-  createdAt: string; // ISO 8601
-  expiresAt: string | null; // ISO 8601 or null for no expiry
+  createdAt: string;
+  expiresAt: string | null;
   revokedAt: string | null;
   parties: PartyInfo[];
   consentText: string;
   signatures: SignatureData[];
   recordingUri: string | null;
-  recordingDuration: number | null; // seconds
+  recordingDuration: number | null;
   pdfUri: string | null;
-  documentHash: string | null; // SHA-256 hash for tamper detection
+  documentHash: string | null;
   metadata: Record<string, string>;
 }
 
 export interface PartyInfo {
   name: string;
-  role: string; // e.g. "Disclosing Party", "Patient", "Participant"
+  role: string;
   email?: string;
 }
 
 export interface SignatureData {
   partyName: string;
-  signatureImage: string; // base64 data URI
-  timestamp: string; // ISO 8601
+  signatureImage: string;
+  timestamp: string;
 }
 
 export interface ConsentTemplate {
@@ -41,11 +41,11 @@ export interface ConsentTemplate {
   category: TemplateCategory;
   description: string;
   fields: TemplateField[];
-  consentText: string; // Markdown with {{field}} placeholders
+  consentText: string;
   requiresDualSignature: boolean;
   defaultExpiryDays: number | null;
   isPremium: boolean;
-  icon: string; // emoji for display
+  icon: string;
 }
 
 export type TemplateCategory =
@@ -83,6 +83,8 @@ export interface PurchaseState {
 }
 
 export type RootStackParamList = {
+  Splash: undefined;
+  Onboarding: undefined;
   Lock: undefined;
   Main: undefined;
   Home: undefined;
@@ -97,4 +99,15 @@ export type RootStackParamList = {
   TemplateForm: { templateId: string };
   TemplateEditor: { templateId?: string };
   ConsentDetail: { consentId: string };
+  PDFPreview: { recordId: string };
 };
+
+export interface DashboardStats {
+  total: number;
+  active: number;
+  expired: number;
+  revoked: number;
+  draft: number;
+  expiringSoon: number;
+  recentlyCreated: number;
+}

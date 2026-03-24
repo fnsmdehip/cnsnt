@@ -1,10 +1,13 @@
 /**
  * cnsnt - Secure Consent Management App
  *
- * Root component handling:
+ * Root component:
+ * - Animated splash screen
+ * - Onboarding flow (first launch)
  * - Authentication gate (biometric + PIN)
  * - Auto-lock on inactivity
- * - Tab + Stack navigation
+ * - Tab navigation with proper icons
+ * - Stack navigation for all screens
  * - Error boundaries on all screens
  * - RevenueCat initialization
  */
@@ -15,9 +18,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ErrorBoundary from './components/ErrorBoundary';
+import SplashScreen from './screens/SplashScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
 import LockScreen from './screens/LockScreen';
 import {
   HomeScreen,
@@ -30,60 +36,90 @@ import {
   MutualReleaseScreen,
   SexualConsentScreen,
   TemplateForm,
+  PDFPreviewScreen,
 } from './screens';
 import { useAppState } from './hooks/useAppState';
 import purchaseService from './services/purchases';
 import vault from './services/encryption';
-import { Colors, Typography } from './constants/theme';
+import { Colors, Typography, Shadows, MIN_TOUCH_SIZE } from './constants/theme';
 import type { RootStackParamList } from './types';
+
+const ONBOARDING_COMPLETE_KEY = 'cnsnt_onboarding_complete';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    Forms: '\u{1F4DD}',
-    Records: '\u{1F4CB}',
-    Settings: '\u{2699}\uFE0F',
+/**
+ * Tab bar icon component using text symbols (no external icon library needed).
+ * Each icon is carefully chosen for the tab's purpose.
+ */
+function TabBarIcon({ routeName, focused }: { routeName: string; focused: boolean }) {
+  const icons: Record<string, { active: string; inactive: string }> = {
+    Forms: { active: '\u{1F4DD}', inactive: '\u{1F4DD}' },
+    Records: { active: '\u{1F4CB}', inactive: '\u{1F4CB}' },
+    Settings: { active: '\u{2699}\uFE0F', inactive: '\u{2699}\uFE0F' },
   };
+
+  const iconSet = icons[routeName] || { active: '\u{2022}', inactive: '\u{2022}' };
+
   return (
-    <View style={tabStyles.iconContainer}>
+    <View style={tabStyles.iconWrapper}>
       <Text style={[tabStyles.icon, focused && tabStyles.iconFocused]}>
-        {icons[label] || '\u{2022}'}
+        {focused ? iconSet.active : iconSet.inactive}
       </Text>
+      {focused && <View style={tabStyles.indicator} />}
     </View>
   );
 }
 
 const tabStyles = StyleSheet.create({
-  iconContainer: {
+  iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 4,
   },
   icon: {
     fontSize: 22,
+    opacity: 0.5,
   },
   iconFocused: {
     fontSize: 24,
+    opacity: 1,
+  },
+  indicator: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.primary,
+    marginTop: 3,
   },
 });
 
+/**
+ * Main tab navigator with Forms, Records, and Settings.
+ */
 function MainTabs({ onLock }: { onLock: () => void }) {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused }) => (
-          <TabIcon label={route.name} focused={focused} />
+          <TabBarIcon routeName={route.name} focused={focused} />
         ),
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textTertiary,
+        tabBarInactiveTintColor: Colors.tabBarInactive,
         tabBarStyle: {
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.divider,
+          backgroundColor: Colors.tabBarBackground,
+          borderTopColor: Colors.tabBarBorder,
+          borderTopWidth: 1,
+          height: Platform.OS === 'ios' ? 88 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          paddingTop: 8,
+          ...Shadows.sm,
         },
         tabBarLabelStyle: {
-          ...Typography.caption,
-          fontWeight: '500' as const,
+          fontSize: 11,
+          fontWeight: '600' as const,
+          marginTop: -2,
         },
         headerStyle: {
           backgroundColor: Colors.surface,
@@ -98,7 +134,7 @@ function MainTabs({ onLock }: { onLock: () => void }) {
       <Tab.Screen
         name="Forms"
         component={HomeScreen}
-        options={{ title: 'Forms' }}
+        options={{ title: 'Templates' }}
       />
       <Tab.Screen
         name="Records"
@@ -112,20 +148,43 @@ function MainTabs({ onLock }: { onLock: () => void }) {
   );
 }
 
+/**
+ * App states:
+ * 1. splash - animated splash screen
+ * 2. onboarding - first-time user flow
+ * 3. locked - authentication required
+ * 4. unlocked - main app
+ */
+type AppPhase = 'splash' | 'onboarding' | 'locked' | 'unlocked';
+
 export default function App() {
-  const [isLocked, setIsLocked] = useState(true);
+  const [phase, setPhase] = useState<AppPhase>('splash');
+
+  const handleSplashComplete = useCallback(async () => {
+    const onboardingDone = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY);
+    if (onboardingDone === 'true') {
+      setPhase('locked');
+    } else {
+      setPhase('onboarding');
+    }
+  }, []);
+
+  const handleOnboardingComplete = useCallback(async () => {
+    await AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
+    setPhase('locked');
+  }, []);
 
   const handleUnlock = useCallback(() => {
-    setIsLocked(false);
+    setPhase('unlocked');
   }, []);
 
   const handleLock = useCallback(() => {
-    setIsLocked(true);
+    setPhase('locked');
   }, []);
 
   useAppState({
     onLock: handleLock,
-    enabled: !isLocked,
+    enabled: phase === 'unlocked',
   });
 
   useEffect(() => {
@@ -138,7 +197,32 @@ export default function App() {
     purchaseService.initialize();
   }, []);
 
-  if (isLocked) {
+  // Phase 1: Splash
+  if (phase === 'splash') {
+    return (
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <SplashScreen onComplete={handleSplashComplete} />
+          <StatusBar style="dark" />
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    );
+  }
+
+  // Phase 2: Onboarding
+  if (phase === 'onboarding') {
+    return (
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <OnboardingScreen onComplete={handleOnboardingComplete} />
+          <StatusBar style="dark" />
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    );
+  }
+
+  // Phase 3: Locked
+  if (phase === 'locked') {
     return (
       <SafeAreaProvider>
         <ErrorBoundary>
@@ -149,6 +233,7 @@ export default function App() {
     );
   }
 
+  // Phase 4: Unlocked - Main App
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
@@ -162,6 +247,7 @@ export default function App() {
               },
               headerShadowVisible: false,
               headerTintColor: Colors.primary,
+              headerBackTitleVisible: false,
             }}
           >
             <Stack.Screen
@@ -206,6 +292,11 @@ export default function App() {
               name="TemplateForm"
               component={TemplateForm}
               options={{ title: 'New Consent Record' }}
+            />
+            <Stack.Screen
+              name="PDFPreview"
+              component={PDFPreviewScreen}
+              options={{ title: 'Document Preview' }}
             />
           </Stack.Navigator>
         </NavigationContainer>
