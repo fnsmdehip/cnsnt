@@ -1,14 +1,15 @@
+/**
+ * Consent Builder Screen - interactive consent checklist.
+ *
+ * Allows user to check off consent items and export as PDF.
+ */
+
 import React, { useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, Pressable, Button, Alert, ImageBackground, Image } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 
-// Visual assets
-const paperTexture = require('../assets/bg_paper_texture.png');
-const checklistIcon = require('../assets/icon_checklist.png');
-const kodamaSprite = require('../assets/sprite_kodama.png');
-
-// Placeholder consent checklist items; replace with actual template content when available
 const initialItems: string[] = [
   'I have read and understood the purpose of this consent.',
   'I agree to the terms and conditions laid out.',
@@ -32,14 +33,13 @@ const ConsentBuilderScreen: React.FC = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      // generate HTML and create PDF via expo-print
       const html = `
         <!DOCTYPE html>
         <html><head><meta charset="utf-8" /><style>
-        body { font-family: Helvetica, Arial, sans-serif; padding: 24px; }
-        h1 { color: #222; }
+        body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 24px; }
+        h1 { color: #1A202C; font-size: 24px; }
         ul { list-style: none; padding: 0; }
-        li { margin-bottom: 12px; font-size: 16px; }
+        li { margin-bottom: 12px; font-size: 16px; color: #334155; }
         </style></head><body>
         <h1>Consent Checklist</h1>
         <ul>
@@ -49,8 +49,7 @@ const ConsentBuilderScreen: React.FC = () => {
       `;
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri);
-    } catch (e) {
-      console.error(e);
+    } catch (_e) {
       Alert.alert('Error', 'Failed to generate PDF');
     } finally {
       setExporting(false);
@@ -58,63 +57,119 @@ const ConsentBuilderScreen: React.FC = () => {
   };
 
   return (
-    <ImageBackground source={paperTexture} style={styles.background}>
-      <Image source={kodamaSprite} style={styles.kodama} />
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Image source={checklistIcon} style={styles.headerIcon} />
-          <Text style={styles.heading}>Consent Checklist</Text>
-        </View>
-        {initialItems.map((label, idx) => (
-          <Pressable key={idx} style={styles.itemRow} onPress={() => toggleItem(idx)}>
-            <View style={[styles.checkbox, checkedItems[idx] && styles.checkboxChecked]} />
-            <Text style={styles.itemLabel}>{label}</Text>
-          </Pressable>
-        ))}
-        <View style={{ marginTop: 20 }}>
-          <Button title={exporting ? 'Exporting...' : 'Export PDF'} onPress={handleExport} disabled={exporting} />
-        </View>
-      </ScrollView>
-    </ImageBackground>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.container}
+    >
+      <View style={styles.header}>
+        <Text style={styles.headerIcon}>{'\u{2705}'}</Text>
+        <Text style={styles.heading}>Consent Checklist</Text>
+      </View>
+
+      <Text style={styles.description}>
+        Review and check each item to confirm your understanding and consent.
+      </Text>
+
+      {initialItems.map((label, idx) => (
+        <Pressable key={idx} style={styles.itemRow} onPress={() => toggleItem(idx)}>
+          <View style={[styles.checkbox, checkedItems[idx] && styles.checkboxChecked]}>
+            {checkedItems[idx] && (
+              <Text style={styles.checkmark}>{'\u2713'}</Text>
+            )}
+          </View>
+          <Text style={styles.itemLabel}>{label}</Text>
+        </Pressable>
+      ))}
+
+      <Pressable
+        style={[styles.exportButton, exporting && styles.exportButtonDisabled]}
+        onPress={handleExport}
+        disabled={exporting}
+      >
+        <Text style={styles.exportButtonText}>
+          {exporting ? 'Exporting...' : 'Export PDF'}
+        </Text>
+      </Pressable>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  background: { flex: 1 },
-  container: { padding: 16 },
+  scrollView: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  container: {
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xxxl,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  headerIcon: {
+    fontSize: 28,
+    marginRight: Spacing.md,
+  },
   heading: {
-    fontSize: 24,
-    lineHeight: 32,
-    fontWeight: '500',
-    marginBottom: 20,
-    color: '#222',
+    ...Typography.h2,
+    color: Colors.textPrimary,
+  },
+  description: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xl,
   },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    backgroundColor: Colors.surface,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderWidth: 2,
-    borderColor: '#222',
-    borderRadius: 4,
-    marginRight: 12,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.sm,
+    marginRight: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#3DDC97',
-    borderColor: '#3DDC97',
+    backgroundColor: Colors.success,
+    borderColor: Colors.success,
+  },
+  checkmark: {
+    color: Colors.textInverse,
+    fontSize: 14,
+    fontWeight: '700',
   },
   itemLabel: {
     flex: 1,
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#222',
+    ...Typography.body,
+    color: Colors.textPrimary,
   },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  headerIcon: { width: 28, height: 28, marginRight: 12 },
-  kodama: { position: 'absolute', bottom: 16, right: 16, width: 60, height: 60, opacity: 0.7 },
+  exportButton: {
+    backgroundColor: Colors.primary,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    marginTop: Spacing.xl,
+    ...Shadows.md,
+  },
+  exportButtonDisabled: {
+    opacity: 0.5,
+  },
+  exportButtonText: {
+    ...Typography.button,
+    color: Colors.textInverse,
+  },
 });
 
-export default ConsentBuilderScreen; 
+export default ConsentBuilderScreen;

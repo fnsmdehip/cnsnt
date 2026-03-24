@@ -94,6 +94,7 @@ export type RootStackParamList = {
   Waiver: undefined;
   MutualRelease: undefined;
   Settings: undefined;
+  TemplateForm: { templateId: string };
   TemplateEditor: { templateId?: string };
   ConsentDetail: { consentId: string };
 };

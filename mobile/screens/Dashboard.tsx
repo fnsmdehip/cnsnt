@@ -5,7 +5,6 @@
  * - List all consent records with status indicators
  * - Search and filter by status
  * - Quick stats (total, expiring soon, recently created)
- * - Calendar-style timeline view
  * - Pull-to-refresh
  */
 
@@ -32,7 +31,10 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants
 type FilterOption = 'all' | ConsentStatus;
 
 interface DashboardProps {
-  navigation: any;
+  navigation: {
+    navigate: (screen: string, params?: Record<string, unknown>) => void;
+    addListener: (event: string, callback: () => void) => () => void;
+  };
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
@@ -52,6 +54,29 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const applyFilters = useCallback(
+    (data: ConsentRecord[], query: string, filter: FilterOption) => {
+      let result = data;
+
+      if (filter !== 'all') {
+        result = result.filter((r) => r.status === filter);
+      }
+
+      if (query.trim()) {
+        const lower = query.toLowerCase();
+        result = result.filter(
+          (r) =>
+            r.title.toLowerCase().includes(lower) ||
+            r.templateName.toLowerCase().includes(lower) ||
+            r.parties.some((p) => p.name.toLowerCase().includes(lower))
+        );
+      }
+
+      setFilteredRecords(result);
+    },
+    []
+  );
+
   const loadData = useCallback(async () => {
     try {
       const [allRecords, dashStats] = await Promise.all([
@@ -61,38 +86,12 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
       setRecords(allRecords);
       setStats(dashStats);
       applyFilters(allRecords, searchQuery, activeFilter);
-    } catch (error) {
-      console.error('[Dashboard] Failed to load data:', error);
+    } catch (_error) {
+      Alert.alert('Error', 'Failed to load consent records.');
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, activeFilter]);
-
-  const applyFilters = (
-    data: ConsentRecord[],
-    query: string,
-    filter: FilterOption
-  ) => {
-    let result = data;
-
-    // Apply status filter
-    if (filter !== 'all') {
-      result = result.filter((r) => r.status === filter);
-    }
-
-    // Apply search query
-    if (query.trim()) {
-      const lower = query.toLowerCase();
-      result = result.filter(
-        (r) =>
-          r.title.toLowerCase().includes(lower) ||
-          r.templateName.toLowerCase().includes(lower) ||
-          r.parties.some((p) => p.name.toLowerCase().includes(lower))
-      );
-    }
-
-    setFilteredRecords(result);
-  };
+  }, [searchQuery, activeFilter, applyFilters]);
 
   useEffect(() => {
     loadData();
@@ -100,9 +99,8 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
 
   useEffect(() => {
     applyFilters(records, searchQuery, activeFilter);
-  }, [searchQuery, activeFilter, records]);
+  }, [searchQuery, activeFilter, records, applyFilters]);
 
-  // Reload when screen is focused
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadData();
@@ -126,8 +124,9 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
           onPress: async () => {
             try {
               await exportService.exportAndShare(record);
-            } catch (e: any) {
-              Alert.alert('Export Error', e.message);
+            } catch (e: unknown) {
+              const message = e instanceof Error ? e.message : 'Unknown error';
+              Alert.alert('Export Error', message);
             }
           },
         },
@@ -260,20 +259,14 @@ const Dashboard: React.FC<DashboardProps> = ({ navigation }) => {
       <Text style={styles.emptyIcon}>{'\u{1F4CB}'}</Text>
       <Text style={styles.emptyTitle}>No consent records yet</Text>
       <Text style={styles.emptySubtitle}>
-        Create your first consent record from the Forms screen.
+        Create your first consent record from the Forms tab.
       </Text>
-      <Pressable
-        style={styles.emptyButton}
-        onPress={() => navigation.navigate('Home')}
-      >
-        <Text style={styles.emptyButtonText}>Go to Forms</Text>
-      </Pressable>
     </View>
   );
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </SafeAreaView>
     );
@@ -325,6 +318,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -477,17 +476,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.xl,
-  },
-  emptyButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    ...Shadows.md,
-  },
-  emptyButtonText: {
-    ...Typography.button,
-    color: Colors.textInverse,
   },
 });
 

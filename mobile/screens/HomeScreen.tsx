@@ -5,12 +5,11 @@
  * Entitlement-aware: gates premium templates behind paywall.
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   Pressable,
   SectionList,
 } from 'react-native';
@@ -22,10 +21,11 @@ import type { ConsentTemplate, TemplateCategory } from '../types';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 
 interface HomeScreenProps {
-  navigation: any;
+  navigation: {
+    navigate: (screen: string, params?: Record<string, unknown>) => void;
+  };
 }
 
-// Legacy form items for backward compat
 const legacyForms = [
   { key: 'Record Audio', screen: 'Recording', icon: '\u{1F3A4}' },
   { key: 'Consent Checklist', screen: 'ConsentBuilder', icon: '\u{2705}', params: { title: 'Consent Checklist' } },
@@ -58,7 +58,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const templates = getAllTemplates();
 
-  // Group templates by category
   const sections = CATEGORY_ORDER
     .map((category) => ({
       title: CATEGORY_LABELS[category],
@@ -68,7 +67,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const handleTemplatePress = (template: ConsentTemplate) => {
     if (template.isPremium && !canUseTemplates) {
-      // Show paywall info via navigation or alert
       navigation.navigate('Settings');
       return;
     }
@@ -104,13 +102,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </Pressable>
         ))}
-        <Pressable
-          style={styles.quickActionCard}
-          onPress={() => navigation.navigate('Dashboard')}
-        >
-          <Text style={styles.quickActionIcon}>{'\u{1F4CB}'}</Text>
-          <Text style={styles.quickActionLabel}>Dashboard</Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -170,7 +161,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <SectionList
           ListHeaderComponent={
             <>
-              {/* App Header */}
               <View style={styles.appHeader}>
                 <Text style={styles.appName}>cnsnt</Text>
                 <Text style={styles.appTagline}>
@@ -359,7 +349,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   proBadgeContainer: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#EFF6FF',
   },
   proBadgeText: {
     ...Typography.caption,

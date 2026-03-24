@@ -30,13 +30,15 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants
 import type { Entitlement } from '../types';
 
 interface SettingsProps {
-  navigation: any;
+  navigation: {
+    navigate: (screen: string) => void;
+  };
   onLock: () => void;
 }
 
 const AUTO_LOCK_OPTIONS = [1, 2, 5, 10, 15, 30];
 
-const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
+const Settings: React.FC<SettingsProps> = ({ onLock }) => {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [biometricName, setBiometricName] = useState('Biometric');
@@ -61,8 +63,8 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
       const purchaseState = await purchaseService.getPurchaseState();
       setEntitlement(purchaseState.entitlement);
       setRecordCount(purchaseState.recordCount);
-    } catch (error) {
-      console.error('[Settings] Failed to load settings:', error);
+    } catch (_error) {
+      Alert.alert('Error', 'Failed to load settings.');
     } finally {
       setLoading(false);
     }
@@ -74,7 +76,6 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
 
   const handleBiometricToggle = async (value: boolean) => {
     if (value) {
-      // Test biometric auth before enabling
       const success = await authService.authenticateWithBiometrics();
       if (!success) {
         Alert.alert(
@@ -103,8 +104,9 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
       }
       const uri = await exportService.exportAllAsJson(records);
       await exportService.shareFile(uri);
-    } catch (error: any) {
-      Alert.alert('Export Error', error.message || 'Failed to export data.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to export data.';
+      Alert.alert('Export Error', message);
     } finally {
       setExporting(false);
     }
@@ -138,8 +140,9 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
                           onPress: () => onLock(),
                         },
                       ]);
-                    } catch (error: any) {
-                      Alert.alert('Error', error.message || 'Failed to delete data.');
+                    } catch (error: unknown) {
+                      const message = error instanceof Error ? error.message : 'Failed to delete data.';
+                      Alert.alert('Error', message);
                     }
                   },
                 },
@@ -181,7 +184,7 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </SafeAreaView>
     );
@@ -191,7 +194,7 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
     <ErrorBoundary>
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* ── Security ── */}
+          {/* Security */}
           <Text style={styles.sectionTitle}>Security</Text>
 
           {hasBiometrics && (
@@ -255,7 +258,7 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
             </Text>
           </Pressable>
 
-          {/* ── Subscription ── */}
+          {/* Subscription */}
           <Text style={styles.sectionTitle}>Subscription</Text>
 
           <View style={styles.subscriptionCard}>
@@ -284,7 +287,7 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
             </Pressable>
           </View>
 
-          {/* ── Data ── */}
+          {/* Data */}
           <Text style={styles.sectionTitle}>Data</Text>
 
           <Pressable
@@ -308,7 +311,7 @@ const Settings: React.FC<SettingsProps> = ({ navigation, onLock }) => {
             </Text>
           </Pressable>
 
-          {/* ── About ── */}
+          {/* About */}
           <Text style={styles.sectionTitle}>About</Text>
 
           <View style={styles.aboutCard}>
@@ -337,6 +340,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContent: {
     padding: Spacing.lg,

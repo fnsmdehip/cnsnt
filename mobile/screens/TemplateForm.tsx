@@ -20,16 +20,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SignatureCanvas from 'react-native-signature-canvas';
 import ErrorBoundary from '../components/ErrorBoundary';
-import StatusBadge from '../components/StatusBadge';
 import { getTemplateById, fillTemplate } from '../data/templates';
 import db from '../services/database';
 import exportService from '../services/export';
 import purchaseService from '../services/purchases';
-import type { ConsentTemplate, ConsentRecord, SignatureData, PartyInfo } from '../types';
+import type { ConsentRecord, SignatureData, PartyInfo } from '../types';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 
 interface TemplateFormProps {
-  navigation: any;
+  navigation: {
+    goBack: () => void;
+  };
   route: {
     params: {
       templateId: string;
@@ -50,7 +51,13 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ navigation, route }) => {
   if (!template) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.errorText}>Template not found.</Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorIcon}>{'\u{26A0}\uFE0F'}</Text>
+          <Text style={styles.errorText}>Template not found.</Text>
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -64,13 +71,11 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ navigation, route }) => {
   };
 
   const isFormValid = (): boolean => {
-    // Check required fields
     for (const field of template.fields) {
       if (field.required && !fieldValues[field.key]?.trim()) {
         return false;
       }
     }
-    // Check signatures
     if (!signatureA) return false;
     if (template.requiresDualSignature && !signatureB) return false;
     return true;
@@ -89,7 +94,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ navigation, route }) => {
     try {
       const now = new Date().toISOString();
 
-      // Build parties from fields
       const parties: PartyInfo[] = [];
       const nameFields = template.fields.filter(
         (f) =>
@@ -105,7 +109,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ navigation, route }) => {
         }
       }
 
-      // Build signatures
       const signatures: SignatureData[] = [];
       if (signatureA) {
         signatures.push({
@@ -122,7 +125,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ navigation, route }) => {
         });
       }
 
-      // Calculate expiry
       let expiresAt: string | null = null;
       if (template.defaultExpiryDays) {
         const expiry = new Date();
@@ -148,15 +150,15 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ navigation, route }) => {
         metadata: fieldValues,
       });
 
-      // Update record count for entitlement tracking
       const count = await db.getRecordCount();
       await purchaseService.updateRecordCount(count);
 
       setSavedRecord(record);
       setSaved(true);
       Alert.alert('Saved', 'Consent record saved and encrypted.');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save consent record.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to save consent record.';
+      Alert.alert('Error', message);
     } finally {
       setSaving(false);
     }
@@ -169,8 +171,9 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ navigation, route }) => {
     }
     try {
       await exportService.exportAndShare(savedRecord);
-    } catch (error: any) {
-      Alert.alert('Export Error', error.message || 'Failed to export PDF.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to export PDF.';
+      Alert.alert('Export Error', message);
     }
   };
 
@@ -352,11 +355,31 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingBottom: Spacing.xxxl,
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: Spacing.lg,
+  },
   errorText: {
     ...Typography.body,
     color: Colors.error,
     textAlign: 'center',
-    marginTop: Spacing.xxxl,
+    marginBottom: Spacing.lg,
+  },
+  backButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+  },
+  backButtonText: {
+    ...Typography.button,
+    color: Colors.textInverse,
   },
   templateHeader: {
     flexDirection: 'row',

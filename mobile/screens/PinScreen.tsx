@@ -1,6 +1,12 @@
+/**
+ * Legacy PIN Screen - replaced by LockScreen.
+ * Kept for backward compatibility.
+ */
+
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 
 interface PinScreenProps {
   onSuccess: () => void;
@@ -42,6 +48,7 @@ const PinScreen: React.FC<PinScreenProps> = ({ onSuccess, pinExists }) => {
         secureTextEntry
         keyboardType="numeric"
         placeholder="PIN"
+        placeholderTextColor={Colors.textTertiary}
         value={pin}
         onChangeText={setPin}
       />
@@ -51,24 +58,42 @@ const PinScreen: React.FC<PinScreenProps> = ({ onSuccess, pinExists }) => {
           secureTextEntry
           keyboardType="numeric"
           placeholder="Confirm PIN"
+          placeholderTextColor={Colors.textTertiary}
           value={pinConfirm}
           onChangeText={setPinConfirm}
         />
       )}
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button
-        title={pinExists ? 'Unlock' : 'Save PIN'}
-        onPress={pinExists ? handleEnterPin : handleSetPin}
-      />
+      <Pressable style={styles.button} onPress={pinExists ? handleEnterPin : handleSetPin}>
+        <Text style={styles.buttonText}>{pinExists ? 'Unlock' : 'Save PIN'}</Text>
+      </Pressable>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 16 },
-  title: { fontSize: 24, textAlign: 'center', marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 4, padding: 8, marginBottom: 12 },
-  error: { color: 'red', textAlign: 'center', marginBottom: 12 },
+  container: { flex: 1, justifyContent: 'center', padding: Spacing.lg, backgroundColor: Colors.background },
+  title: { ...Typography.h2, textAlign: 'center', marginBottom: Spacing.lg, color: Colors.textPrimary },
+  input: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    backgroundColor: Colors.surface,
+    ...Typography.body,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  error: { ...Typography.bodySmall, color: Colors.error, textAlign: 'center', marginBottom: Spacing.md },
+  button: {
+    backgroundColor: Colors.primary,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    ...Shadows.md,
+  },
+  buttonText: { ...Typography.button, color: Colors.textInverse },
 });
 
-export default PinScreen; 
+export default PinScreen;

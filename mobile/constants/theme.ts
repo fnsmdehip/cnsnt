@@ -1,40 +1,40 @@
 /**
  * Design system constants for cnsnt app.
- * Consistent colors, typography, spacing used across all screens.
+ * Clean light theme with trust-building colors for legal/security use.
  */
 
 export const Colors = {
   // Primary palette
-  primary: '#1A73E8',
-  primaryDark: '#1557B0',
-  primaryLight: '#E8F0FE',
+  primary: '#3B82F6',
+  primaryDark: '#2563EB',
+  primaryLight: '#EFF6FF',
 
   // Status
-  success: '#3DDC97',
+  success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
   info: '#3B82F6',
 
   // Neutrals
-  background: '#FAFAFA',
+  background: '#F8F9FA',
   surface: '#FFFFFF',
-  surfaceElevated: '#F5F5F5',
-  border: '#E0E0E0',
-  borderLight: '#F0F0F0',
-  divider: '#EEEEEE',
+  surfaceElevated: '#F1F5F9',
+  border: '#E2E8F0',
+  borderLight: '#E2E8F0',
+  divider: '#E2E8F0',
 
   // Text
-  textPrimary: '#1A1A1A',
-  textSecondary: '#666666',
-  textTertiary: '#999999',
+  textPrimary: '#1A202C',
+  textSecondary: '#64748B',
+  textTertiary: '#94A3B8',
   textInverse: '#FFFFFF',
-  textLink: '#1A73E8',
+  textLink: '#3B82F6',
 
   // Consent status
-  statusActive: '#3DDC97',
+  statusActive: '#10B981',
   statusExpired: '#F59E0B',
   statusRevoked: '#EF4444',
-  statusDraft: '#9CA3AF',
+  statusDraft: '#94A3B8',
 } as const;
 
 export const Typography = {
@@ -61,8 +61,8 @@ export const Spacing = {
 export const BorderRadius = {
   sm: 4,
   md: 8,
-  lg: 12,
-  xl: 16,
+  lg: 16,
+  xl: 20,
   round: 9999,
 } as const;
 

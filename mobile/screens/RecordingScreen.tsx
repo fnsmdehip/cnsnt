@@ -4,12 +4,11 @@
  * Features:
  * - expo-av for audio recording
  * - Timestamp overlay showing recording duration
- * - Automatic transcription placeholder (premium feature)
  * - Save recording linked to specific consent form
  * - Playback with waveform-style visualization
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,7 +16,6 @@ import {
   Pressable,
   Alert,
   Animated,
-  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
@@ -26,17 +24,20 @@ import * as Sharing from 'expo-sharing';
 import ErrorBoundary from '../components/ErrorBoundary';
 import PaywallGate from '../components/PaywallGate';
 import usePurchases from '../hooks/usePurchases';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius } from '../constants/theme';
 
 interface RecordingScreenProps {
-  navigation: any;
-  route: any;
+  navigation: {
+    goBack: () => void;
+  };
+  route: {
+    params?: {
+      consentId?: string;
+    };
+  };
 }
 
-const RecordingScreen: React.FC<RecordingScreenProps> = ({
-  navigation,
-  route,
-}) => {
+const RecordingScreen: React.FC<RecordingScreenProps> = () => {
   const { canRecord } = usePurchases();
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -54,7 +55,6 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
   const durationTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Request audio permissions
   useEffect(() => {
     (async () => {
       const { status } = await Audio.requestPermissionsAsync();
@@ -62,7 +62,6 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
     })();
 
     return () => {
-      // Cleanup
       if (durationTimer.current) clearInterval(durationTimer.current);
       if (sound) {
         sound.unloadAsync();
@@ -70,7 +69,6 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
     };
   }, []);
 
-  // Pulse animation for recording indicator
   useEffect(() => {
     if (isRecording) {
       const pulse = Animated.loop(
@@ -118,17 +116,14 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
       setDuration(0);
       setWaveformData([]);
 
-      // Timer for duration display and fake waveform
       durationTimer.current = setInterval(() => {
         setDuration((prev) => prev + 1);
-        // Generate random waveform bar for visualization
         setWaveformData((prev) => [
           ...prev,
           0.2 + Math.random() * 0.8,
         ]);
       }, 1000);
-    } catch (error) {
-      console.error('[Recording] Failed to start:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to start recording. Check permissions.');
     }
   };
@@ -154,13 +149,8 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
 
       if (uri) {
         setRecordingUri(uri);
-
-        // Get file info
-        const info = await FileSystem.getInfoAsync(uri);
-        console.log('[Recording] Saved to:', uri, 'Size:', info.exists && 'size' in info ? info.size : 'unknown');
       }
-    } catch (error) {
-      console.error('[Recording] Failed to stop:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to stop recording.');
     }
   };
@@ -189,8 +179,7 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
 
       setSound(newSound);
       setIsPlaying(true);
-    } catch (error) {
-      console.error('[Recording] Playback failed:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to play recording.');
     }
   };
@@ -216,8 +205,9 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
         mimeType: 'audio/m4a',
         dialogTitle: 'Share Consent Recording',
       });
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to share recording.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to share recording.';
+      Alert.alert('Error', message);
     }
   };
 
@@ -248,11 +238,9 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
     );
   };
 
-  // Waveform visualization
   const renderWaveform = () => {
     if (waveformData.length === 0) return null;
 
-    // Show last 40 bars
     const visibleBars = waveformData.slice(-40);
 
     return (
@@ -412,7 +400,7 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
             {/* Transcription Placeholder */}
             <View style={styles.transcriptionSection}>
               <View style={styles.premiumBadge}>
-                <Text style={styles.premiumBadgeText}>PREMIUM</Text>
+                <Text style={styles.premiumBadgeText}>COMING SOON</Text>
               </View>
               <Text style={styles.transcriptionTitle}>
                 Automatic Transcription

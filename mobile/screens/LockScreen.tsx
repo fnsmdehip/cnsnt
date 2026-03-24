@@ -44,7 +44,6 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         setBiometricName(name);
       }
 
-      // Try biometric auth automatically if enabled
       if (state.biometricEnabled && state.pinIsSet) {
         const success = await authService.authenticateWithBiometrics();
         if (success) {
@@ -52,8 +51,8 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
           return;
         }
       }
-    } catch (e) {
-      console.error('[LockScreen] Auth check failed:', e);
+    } catch (_e) {
+      Alert.alert('Error', 'Authentication check failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -78,8 +77,9 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
     try {
       await authService.setPin(pin);
       onUnlock();
-    } catch (e: any) {
-      setError(e.message || 'Failed to set PIN');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to set PIN';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -101,8 +101,9 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         setError('Incorrect PIN');
         setPin('');
       }
-    } catch (e: any) {
-      setError(e.message || 'Authentication failed');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Authentication failed';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -118,8 +119,9 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
       } else {
         setError(`${biometricName} authentication failed. Use PIN instead.`);
       }
-    } catch (e: any) {
-      setError(e.message || 'Biometric auth failed');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Biometric auth failed';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -128,8 +130,10 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Authenticating...</Text>
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Authenticating...</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -201,6 +205,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  loadingContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,

@@ -40,7 +40,6 @@ import type { RootStackParamList } from './types';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
-// Tab icon component
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
     Forms: '\u{1F4DD}',
@@ -69,7 +68,6 @@ const tabStyles = StyleSheet.create({
   },
 });
 
-// Tab navigator for main app
 function MainTabs({ onLock }: { onLock: () => void }) {
   return (
     <Tab.Navigator
@@ -85,7 +83,7 @@ function MainTabs({ onLock }: { onLock: () => void }) {
         },
         tabBarLabelStyle: {
           ...Typography.caption,
-          fontWeight: '500',
+          fontWeight: '500' as const,
         },
         headerStyle: {
           backgroundColor: Colors.surface,
@@ -125,20 +123,17 @@ export default function App() {
     setIsLocked(true);
   }, []);
 
-  // Auto-lock on background/inactivity
   useAppState({
     onLock: handleLock,
     enabled: !isLocked,
   });
 
-  // Register vault auto-lock callback
   useEffect(() => {
     vault.onAutoLock(() => {
       handleLock();
     });
   }, [handleLock]);
 
-  // Initialize purchases
   useEffect(() => {
     purchaseService.initialize();
   }, []);
@@ -178,7 +173,7 @@ export default function App() {
             <Stack.Screen
               name="ConsentBuilder"
               component={ConsentBuilderScreen}
-              options={({ route }: any) => ({
+              options={({ route }) => ({
                 title: route.params?.title || 'Consent Builder',
               })}
             />

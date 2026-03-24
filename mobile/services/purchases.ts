@@ -14,10 +14,6 @@ import type { Entitlement, PurchaseState } from '../types';
 
 const ENTITLEMENT_CACHE_KEY = 'cnsnt_entitlement';
 const RECORD_COUNT_KEY = 'cnsnt_record_count';
-const RC_API_KEY = 'sk_OjSpZwUNzvGZNzaMgFkeUUyCPEuJL';
-
-// RevenueCat entitlement identifiers
-const PRO_ENTITLEMENT_ID = 'pro';
 
 /**
  * Initialize RevenueCat.
@@ -25,12 +21,11 @@ const PRO_ENTITLEMENT_ID = 'pro';
  * For the managed Expo workflow, we use a mock that checks cached state.
  */
 async function initializeRevenueCat(): Promise<void> {
-  // RevenueCat SDK initialization would go here:
+  // RevenueCat SDK initialization would go here in production:
   // await Purchases.configure({ apiKey: RC_API_KEY });
   //
   // For Expo managed workflow, the actual RC SDK requires a custom dev client.
   // We provide the integration point and cache the entitlement state.
-  console.log('[Purchases] RevenueCat configured with key:', RC_API_KEY.substring(0, 8) + '...');
 }
 
 class PurchaseService {
@@ -45,8 +40,7 @@ class PurchaseService {
     try {
       await initializeRevenueCat();
       this.initialized = true;
-    } catch (error) {
-      console.warn('[Purchases] Failed to initialize RevenueCat:', error);
+    } catch (_error) {
       // Graceful degradation - app works in free tier
     }
   }
@@ -127,16 +121,12 @@ class PurchaseService {
       // const { customerInfo } = await Purchases.purchasePackage(proPackage);
       // const isPro = customerInfo.entitlements.active[PRO_ENTITLEMENT_ID] != null;
 
-      // For development/demo, we simulate the purchase
-      console.log('[Purchases] Purchase flow would launch here');
-
       // This would be replaced by actual RevenueCat result:
       // await AsyncStorage.setItem(ENTITLEMENT_CACHE_KEY, 'pro');
       // return true;
 
       return false; // No actual purchase in dev mode
-    } catch (error) {
-      console.warn('[Purchases] Purchase failed:', error);
+    } catch (_error) {
       return false;
     }
   }

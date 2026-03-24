@@ -469,6 +469,54 @@ Each party represents that:
 ## Governing Law
 This release shall be governed by the laws of {{governingLaw}}.`,
   },
+
+  // ─── PERSONAL CONSENT ──────────────────────────────────
+  {
+    id: 'tpl_personal_consent',
+    name: 'General Personal Consent',
+    category: 'personal',
+    description: 'A flexible consent form for personal agreements, permissions, or acknowledgments.',
+    icon: '\u{1F4DD}',
+    isPremium: false,
+    requiresDualSignature: true,
+    defaultExpiryDays: 90,
+    fields: [
+      { key: 'consentGiver', label: 'Person Giving Consent', placeholder: 'Full legal name', type: 'text', required: true },
+      { key: 'consentReceiver', label: 'Person Receiving Consent', placeholder: 'Full legal name', type: 'text', required: true },
+      { key: 'subject', label: 'Subject of Consent', placeholder: 'What is being consented to', type: 'text', required: true },
+      { key: 'details', label: 'Details & Conditions', placeholder: 'Describe the terms and conditions in detail', type: 'multiline', required: true },
+      { key: 'limitations', label: 'Limitations', placeholder: 'Any restrictions or boundaries', type: 'multiline', required: false },
+      { key: 'date', label: 'Date', placeholder: 'YYYY-MM-DD', type: 'date', required: true },
+    ],
+    consentText: `# Personal Consent Agreement
+
+**Date:** {{date}}
+
+## Parties
+- **Consent Giver:** {{consentGiver}}
+- **Consent Receiver:** {{consentReceiver}}
+
+## Subject
+{{subject}}
+
+## Terms & Conditions
+I, {{consentGiver}}, hereby provide my informed and voluntary consent to {{consentReceiver}} regarding the following:
+
+{{details}}
+
+## Limitations
+{{limitations}}
+
+## Acknowledgments
+- This consent is given freely and voluntarily
+- I understand the nature and implications of this consent
+- I may withdraw this consent at any time by providing written notice
+- This agreement is valid for 90 days from the date of signing unless renewed
+- Both parties agree to act in good faith
+
+## Signatures
+By signing below, both parties acknowledge and agree to the terms stated above.`,
+  },
 ];
 
 /**
