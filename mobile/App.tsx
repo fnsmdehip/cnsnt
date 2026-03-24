@@ -247,7 +247,7 @@ export default function App() {
               },
               headerShadowVisible: false,
               headerTintColor: Colors.primary,
-              headerBackTitleVisible: false,
+              headerBackButtonDisplayMode: 'minimal',
             }}
           >
             <Stack.Screen
@@ -265,7 +265,7 @@ export default function App() {
             />
             <Stack.Screen
               name="Recording"
-              component={RecordingScreen}
+              component={RecordingScreen as React.ComponentType<any>}
               options={{ title: 'Audio Recording' }}
             />
             <Stack.Screen
@@ -290,12 +290,12 @@ export default function App() {
             />
             <Stack.Screen
               name="TemplateForm"
-              component={TemplateForm}
+              component={TemplateForm as React.ComponentType<any>}
               options={{ title: 'New Consent Record' }}
             />
             <Stack.Screen
               name="PDFPreview"
-              component={PDFPreviewScreen}
+              component={PDFPreviewScreen as React.ComponentType<any>}
               options={{ title: 'Document Preview' }}
             />
           </Stack.Navigator>
